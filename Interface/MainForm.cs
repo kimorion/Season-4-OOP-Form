@@ -137,6 +137,7 @@ namespace Program
             ordersTree.LabelEdit = false;
 
             ordersTree.Nodes.Clear();
+            customerTree.ExpandAll();
         }
 
         void LoadCustomerOrders(Customer customer)
@@ -227,7 +228,6 @@ namespace Program
                 if (!node.IsEditing)
                 {
                     node.BeginEdit();
-                    Console.WriteLine("EDIT");
                 }
             }
             else
@@ -259,7 +259,7 @@ namespace Program
                            "Редактирование профиля клиента");
                         e.CancelEdit = true;
                         e.Node.EndEdit(true);
-                        UpdateView();
+                        //UpdateView();
                         break;
                 }
 
@@ -350,13 +350,14 @@ namespace Program
             }
         }
 
-        private void DrawNode(object sender, DrawTreeNodeEventArgs e)
+        private void DrawCustomerNode(object sender, DrawTreeNodeEventArgs e)
         {
+            var tree = sender as TreeView;
             TextRenderer.DrawText(e.Graphics,
                 e.Node.Text,
                 e.Node.NodeFont,
                 new Point(e.Node.Bounds.Left, e.Node.Bounds.Top),
-                (sender as TreeView).SelectedNode == e.Node ? SystemColors.HighlightText : SystemColors.WindowText);
+                tree.SelectedNode == e.Node && tree.Focused ? SystemColors.HighlightText : SystemColors.WindowText);
         }
 
         private void CreateMenu()
@@ -515,23 +516,22 @@ namespace Program
         }
 
         private void CreateTrees()
-        {
-            #region Trees
-            customerTree = new TreeView()
+        {            
+            customerTree = new BufferedTreeView()
             {
                 Dock = DockStyle.Fill,
                 ShowNodeToolTips = true,
                 CausesValidation = false
             };
 
-            itemsTree = new TreeView()
+            itemsTree = new BufferedTreeView()
             {
                 Dock = DockStyle.Fill,
                 ShowNodeToolTips = true,
                 AllowDrop = true
             };
 
-            ordersTree = new TreeView()
+            ordersTree = new BufferedTreeView()
             {
                 Dock = DockStyle.Fill,
                 ShowNodeToolTips = true,
@@ -541,7 +541,6 @@ namespace Program
             customerTree.NodeMouseDoubleClick += (sender, args) => tree_AfterDoubleClick(sender, args);
             customerTree.AfterLabelEdit += (sender, args) => customerTree_AfterLabelEdit(sender, args);
             customerTree.NodeMouseClick += (sender, args) => customerTree.SelectedNode = args.Node;
-
 
             itemsTree.ItemDrag += (sender, args) => tree_BeginDrag(sender, args);
             //itemsTree.DragOver += (sender, args) => tree_DragOver(sender, args);
@@ -554,7 +553,14 @@ namespace Program
             ordersTree.DragDrop += (sender, args) => tree_EndDrag(sender, args);
             ordersTree.NodeMouseClick += (sender, args) => ordersTree.SelectedNode = args.Node;
             //ordersTree.NodeMouseDoubleClick += (sender, args) => tree_AfterDoubleClick(sender, args);
-            #endregion
+
+            customerTree.DrawMode = TreeViewDrawMode.OwnerDrawText;
+            itemsTree.DrawMode = TreeViewDrawMode.OwnerDrawText;
+            ordersTree.DrawMode = TreeViewDrawMode.OwnerDrawText;
+
+            customerTree.DrawNode += (sender, args) => DrawCustomerNode(sender, args);
+            itemsTree.DrawNode += (sender, args) => DrawCustomerNode(sender, args);
+            ordersTree.DrawNode += (sender, args) => DrawCustomerNode(sender, args);
         }
 
         private void CreateLayout()
@@ -601,13 +607,6 @@ namespace Program
             //Shown += (sender, args) => UpdateView();
 
             db.StateChanged += UpdateView;
-
-            Console.WriteLine("Updated!");
-            customerTree.Invalidate();
-            customerTree.Update();
-
-            customerTree.DrawMode = TreeViewDrawMode.OwnerDrawText;
-            customerTree.DrawNode += (sender, args) => DrawNode(sender, args);
         }
 
 

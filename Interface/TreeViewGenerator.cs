@@ -84,8 +84,8 @@ namespace Program
         public void GenerateItemsTree(TreeView itemsTree, List<Item> items,
             ContextMenu itemMenu)
         {
-            itemsTree.Nodes.Clear();
             itemsTree.BeginUpdate();
+            itemsTree.Nodes.Clear();
             foreach (var item in items)
             {
                 var itemRoot = new TreeNode(item.Article);
@@ -181,8 +181,8 @@ namespace Program
         public void GenerateOrdersTree(TreeView ordersTree, Customer customer,
             ContextMenu orderMenu, ContextMenu orderLineMenu)
         {
-            ordersTree.Nodes.Clear();
             ordersTree.BeginUpdate();
+            ordersTree.Nodes.Clear();
 
             ordersTree.Nodes.Add(new TreeNode()
             {
