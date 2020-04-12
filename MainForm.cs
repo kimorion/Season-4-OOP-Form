@@ -45,10 +45,17 @@ namespace Program
         TreeView itemsTree;
         TreeView ordersTree;
 
+        private Label customersLabel;
+        private Label itemsLabel;
+        private Label orderLabel;
+        private Button addOrderButton;
         ContextMenu userContextMenu;
         ContextMenu itemContextMenu;
         ContextMenu orderContextMenu;
         ContextMenu orderLineContextMenu;
+
+        private TableLayoutPanel orderTable;
+        private TableLayoutPanel mainTable;
 
         void LoadCustomersFromFile()
         {
@@ -124,9 +131,12 @@ namespace Program
             treeGenerator.GenerateItemsTree(itemsTree, db.GetItems(), itemContextMenu);
             treeGenerator.GenerateCustomersTree(customerTree, db.GetCustomers(), userContextMenu);
 
+            // Workaround to avoid strange visual bug after TreeView editing
+            customerTree.LabelEdit = false;
+            itemsTree.LabelEdit = false;
+            ordersTree.LabelEdit = false;
+
             ordersTree.Nodes.Clear();
-            Invalidate();
-            Refresh();
         }
 
         void LoadCustomerOrders(Customer customer)
@@ -247,7 +257,9 @@ namespace Program
                     default:
                         MessageBox.Show("Выбранный пункт нельзя редактировать.\n",
                            "Редактирование профиля клиента");
+                        e.CancelEdit = true;
                         e.Node.EndEdit(true);
+                        UpdateView();
                         break;
                 }
 
@@ -338,11 +350,18 @@ namespace Program
             }
         }
 
-
-
-        public MainForm()
+        private void DrawNode(object sender, DrawTreeNodeEventArgs e)
         {
-            SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
+            TextRenderer.DrawText(e.Graphics,
+                e.Node.Text,
+                e.Node.NodeFont,
+                new Point(e.Node.Bounds.Left, e.Node.Bounds.Top),
+                (sender as TreeView).SelectedNode == e.Node ? SystemColors.HighlightText : SystemColors.WindowText);
+        }
+
+        private void CreateMenu()
+        {
+            #region MENU
             // MENU
             MenuItem loadCustomersMenuItem = new MenuItem("Загрузить список клиентов");
             MenuItem loadItemsMenuItem = new MenuItem("Загрузить список товаров");
@@ -375,8 +394,12 @@ namespace Program
             Width = 1200;
             Height = 800;
             CenterToScreen();
+            #endregion
+        }
 
-            // ContextMenu
+        private void CreateContextMenu()
+        {
+            #region ContextMenu
             orderContextMenu = new ContextMenu();
             var deleteOrderItem = new MenuItem("Удалить заказ");
             deleteOrderItem.Click += (sender, args) =>
@@ -427,16 +450,14 @@ namespace Program
                         LoadCustomerOrders(customerTree.SelectedNode.Tag as Customer);
             };
             userContextMenu.MenuItems.Add(editOrdersItem);
+            #endregion
+        }
 
-            // WINDOW CONTROLS
-            var box1 = new TextBox
-            {
-                Dock = DockStyle.Fill,
-                Text = "BOX1",
-                Multiline = true
-            };
+        private void CreateWindowControls()
+        {
+            #region WINDOW CONTROLS
 
-            var customersLabel = new Label()
+            customersLabel = new Label()
             {
                 Text = "Покупатели",
                 TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
@@ -444,7 +465,7 @@ namespace Program
                 Dock = DockStyle.Fill
             };
 
-            var itemsLabel = new Label()
+            itemsLabel = new Label()
             {
                 Text = "Товары",
                 TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
@@ -452,7 +473,7 @@ namespace Program
                 Dock = DockStyle.Fill
             };
 
-            var orderLabel = new Label()
+            orderLabel = new Label()
             {
                 Text = "Заказы",
                 TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
@@ -460,7 +481,7 @@ namespace Program
                 Dock = DockStyle.Fill
             };
 
-            var addOrderButton = new Button()
+            addOrderButton = new Button()
             {
                 Text = "+",
                 TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
@@ -482,7 +503,7 @@ namespace Program
                     "Сообщение");
             };
 
-            var orderTable = new TableLayoutPanel();
+            orderTable = new TableLayoutPanel();
             orderTable.Dock = DockStyle.Fill;
             orderTable.RowStyles.Clear();
             orderTable.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -490,18 +511,22 @@ namespace Program
             orderTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 40));
             orderTable.Controls.Add(orderLabel, 0, 0);
             orderTable.Controls.Add(addOrderButton, 1, 0);
+            #endregion
+        }
 
+        private void CreateTrees()
+        {
+            #region Trees
             customerTree = new TreeView()
             {
                 Dock = DockStyle.Fill,
-                LabelEdit = true,
-                ShowNodeToolTips = true
+                ShowNodeToolTips = true,
+                CausesValidation = false
             };
 
             itemsTree = new TreeView()
             {
                 Dock = DockStyle.Fill,
-                LabelEdit = true,
                 ShowNodeToolTips = true,
                 AllowDrop = true
             };
@@ -509,7 +534,6 @@ namespace Program
             ordersTree = new TreeView()
             {
                 Dock = DockStyle.Fill,
-                LabelEdit = false,
                 ShowNodeToolTips = true,
                 AllowDrop = true
             };
@@ -517,6 +541,7 @@ namespace Program
             customerTree.NodeMouseDoubleClick += (sender, args) => tree_AfterDoubleClick(sender, args);
             customerTree.AfterLabelEdit += (sender, args) => customerTree_AfterLabelEdit(sender, args);
             customerTree.NodeMouseClick += (sender, args) => customerTree.SelectedNode = args.Node;
+
 
             itemsTree.ItemDrag += (sender, args) => tree_BeginDrag(sender, args);
             //itemsTree.DragOver += (sender, args) => tree_DragOver(sender, args);
@@ -529,27 +554,41 @@ namespace Program
             ordersTree.DragDrop += (sender, args) => tree_EndDrag(sender, args);
             ordersTree.NodeMouseClick += (sender, args) => ordersTree.SelectedNode = args.Node;
             //ordersTree.NodeMouseDoubleClick += (sender, args) => tree_AfterDoubleClick(sender, args);
+            #endregion
+        }
 
-            // LAYOUT
-            var table = new TableLayoutPanel();
-            table.RowStyles.Clear();
-            table.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
-            table.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33));
-            table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33));
-            table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33));
+        private void CreateLayout()
+        {
+            #region LAYOUT
+            mainTable = new TableLayoutPanel();
+            mainTable.RowStyles.Clear();
+            mainTable.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
+            mainTable.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            mainTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33));
+            mainTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33));
+            mainTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33));
 
-            table.Controls.Add(customersLabel, 0, 0);
-            table.Controls.Add(itemsLabel, 1, 0);
-            table.Controls.Add(orderTable, 2, 0);
-            table.Controls.Add(customerTree, 0, 1);
-            table.Controls.Add(itemsTree, 1, 1);
-            table.Controls.Add(ordersTree, 2, 1);
+            mainTable.Controls.Add(customersLabel, 0, 0);
+            mainTable.Controls.Add(itemsLabel, 1, 0);
+            mainTable.Controls.Add(orderTable, 2, 0);
+            mainTable.Controls.Add(customerTree, 0, 1);
+            mainTable.Controls.Add(itemsTree, 1, 1);
+            mainTable.Controls.Add(ordersTree, 2, 1);
 
-            table.Dock = DockStyle.Fill;
-            table.CellBorderStyle = TableLayoutPanelCellBorderStyle.Inset;
+            mainTable.Dock = DockStyle.Fill;
+            mainTable.CellBorderStyle = TableLayoutPanelCellBorderStyle.Inset;
 
-            Controls.Add(table);
+            Controls.Add(mainTable);
+            #endregion
+        }
+
+        public MainForm()
+        {
+            CreateMenu();
+            CreateContextMenu();
+            CreateWindowControls();
+            CreateTrees();
+            CreateLayout();            
 
             InitializeDB(false);
             LoadCustomersFromFile("CUSTOMERS.DAT");
@@ -562,6 +601,15 @@ namespace Program
             //Shown += (sender, args) => UpdateView();
 
             db.StateChanged += UpdateView;
+
+            Console.WriteLine("Updated!");
+            customerTree.Invalidate();
+            customerTree.Update();
+
+            customerTree.DrawMode = TreeViewDrawMode.OwnerDrawText;
+            customerTree.DrawNode += (sender, args) => DrawNode(sender, args);
         }
+
+
     }
 }

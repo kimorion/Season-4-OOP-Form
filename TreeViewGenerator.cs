@@ -75,10 +75,10 @@ namespace Program
                     ToolTipText = "Статус аккаунта",
                     Tag = customer
                 });
+
                 customerTree.Nodes.Add(customerRoot);
             }
             customerTree.EndUpdate();
-            customerTree.Refresh();
         }
 
         public void GenerateItemsTree(TreeView itemsTree, List<Item> items,
