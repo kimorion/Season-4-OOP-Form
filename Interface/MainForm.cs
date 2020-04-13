@@ -471,7 +471,7 @@ namespace Program
                     if (itemTree.SelectedNode.Name == "item")
                     {
                         var orderArgs = itemTree.SelectedNode.Tag as OrderArgs;
-                        throw new NotImplementedException();
+                        db.DeleteItem(orderArgs.itemArticle);
                     }
             };
             itemContextMenu.MenuItems.Add(deleteItemItem);

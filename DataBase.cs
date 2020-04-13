@@ -222,14 +222,16 @@ namespace Program
             return items.Values.ToList().Clone() as List<Item>;
         }
 
-        public bool DeleteItem(Item item)
+        public bool DeleteItem(string itemArticle)
         {
-            if (items.Remove(item.Article))
+            if (!items.ContainsKey(itemArticle))
             {
-                StateChanged?.Invoke();
-                return true;
+                UserWarning?.Invoke("В базе нет товара с данным артикулом");
+                return false;
             }
-            return false;
+            items.Remove(itemArticle);
+            StateChanged?.Invoke();
+            return true;
         }
 
         // Order
