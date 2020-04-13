@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Threading;
+using Program.Promotion;
 
 namespace Program
 {
@@ -42,20 +43,24 @@ namespace Program
         FileLoader fileLoader = new FileLoader();
         TreeViewGenerator treeGenerator = new TreeViewGenerator();
         TreeView customerTree;
-        TreeView itemsTree;
-        TreeView ordersTree;
+        TreeView itemTree;
+        TreeView orderTree;
+        TreeView discountTree;
 
-        private Label customersLabel;
-        private Label itemsLabel;
-        private Label orderLabel;
-        private Button addOrderButton;
+        Label customersLabel;
+        Label itemsLabel;
+        Label orderLabel;
+        Label discountLabel;
+        Button addOrderButton;
         ContextMenu userContextMenu;
         ContextMenu itemContextMenu;
         ContextMenu orderContextMenu;
         ContextMenu orderLineContextMenu;
+        ContextMenu discountContextMenu;
 
-        private TableLayoutPanel orderTable;
-        private TableLayoutPanel mainTable;
+        TableLayoutPanel orderHeaderTable;
+        TableLayoutPanel mainTable;
+        TableLayoutPanel middleTable;
 
         void LoadCustomersFromFile()
         {
@@ -128,21 +133,34 @@ namespace Program
                 return;
             }
 
-            treeGenerator.GenerateItemsTree(itemsTree, db.GetItems(), itemContextMenu);
-            treeGenerator.GenerateCustomersTree(customerTree, db.GetCustomers(), userContextMenu);
+            treeGenerator.GenerateItemTree(itemTree, db.GetItems(), itemContextMenu);
+            treeGenerator.GenerateCustomerTree(customerTree, db.GetCustomers(), userContextMenu);
+            treeGenerator.GenerateDiscountTree(discountTree, db.GetDiscounts());
 
             // Workaround to avoid strange visual bug after TreeView editing
             customerTree.LabelEdit = false;
-            itemsTree.LabelEdit = false;
-            ordersTree.LabelEdit = false;
+            itemTree.LabelEdit = false;
+            orderTree.LabelEdit = false;
 
-            ordersTree.Nodes.Clear();
+            if (orderTree.TopNode != null)
+            {
+                var args = orderTree.TopNode.Tag as OrderArgs;
+                orderTree.Nodes.Clear();
+                LoadCustomerOrders(db.GetCustomer(args.customer.ID));
+                orderTree.ExpandAll();
+            }
             customerTree.ExpandAll();
+        }
+
+        void ShowDiscountWarning(int orderNumber, string discountName, string reason)
+        {
+            MessageBox.Show(string.Format("{0} была удалена из заказа '{1}'.\nПричина: {2}", discountName, orderNumber, reason),
+                "Внимание");
         }
 
         void LoadCustomerOrders(Customer customer)
         {
-            treeGenerator.GenerateOrdersTree(ordersTree, customer, orderContextMenu, orderLineContextMenu);
+            treeGenerator.GenerateOrderTree(orderTree, customer, orderContextMenu, orderLineContextMenu, discountContextMenu);
         }
 
         void InitializeDB(bool isExplicit)
@@ -160,7 +178,7 @@ namespace Program
 
         void CreateOrder(Customer customer)
         {
-            Order testOrder = new Order(random.Next(1000000000, 2000000000), "Please, enter address", DeliveryType.Stardard);
+            Order testOrder = new Order(random.Next(1000000000, 2000000000), "Please, enter address", DeliveryType.Standard);
             customer.OrderManager.AddOrder(testOrder);
             db.EditCustomer(customer);
         }
@@ -168,14 +186,13 @@ namespace Program
         private void tree_BeginDrag(object sender, ItemDragEventArgs e)
         {
             var node = e.Item as TreeNode;
-            if (node.Name == "item")
+            if (node.Name == "item" || node.Name == "discount")
             {
-                //tree.DoDragDrop(node, DragDropEffects.Copy);
                 DoDragDrop(e.Item, DragDropEffects.Copy);
             }
         }
 
-        private void tree_DragOver(object sender, System.Windows.Forms.DragEventArgs e)
+        private void tree_DragOver(object sender, DragEventArgs e)
         {
             TreeView tree = (TreeView)sender;
 
@@ -188,7 +205,15 @@ namespace Program
                 Point pt = new Point(e.X, e.Y);
                 pt = tree.PointToClient(pt);
                 TreeNode nodeTarget = tree.GetNodeAt(pt);
-                if (nodeTarget != null && nodeTarget.Name.Equals("items"))
+                if (nodeTarget == null) return;
+
+                if (nodeTarget.Name.Equals("items"))
+                {
+                    e.Effect = DragDropEffects.Copy;
+                    tree.SelectedNode = nodeTarget;
+                }
+
+                if (nodeTarget.Name.Equals("discounts"))
                 {
                     e.Effect = DragDropEffects.Copy;
                     tree.SelectedNode = nodeTarget;
@@ -197,7 +222,7 @@ namespace Program
             }
         }
 
-        private void tree_EndDrag(object sender, System.Windows.Forms.DragEventArgs e)
+        private void orderTree_EndItemDrag(object sender, DragEventArgs e)
         {
             TreeView tree = (TreeView)sender;
             Point pt = new Point(e.X, e.Y);
@@ -206,16 +231,26 @@ namespace Program
             TreeNode nodeTarget = tree.GetNodeAt(pt);
             TreeNode nodeSource = (TreeNode)e.Data.GetData(typeof(TreeNode));
 
-            uint quantity = (uint)Prompt.ShowDialog("Enter quantity", "Enter quantity");
-            var newLine = new OrderLine((nodeSource.Tag as Item).Clone() as Item, quantity);
+            if (nodeSource.Name == "item" && nodeTarget.Name == "items")
+            {
+                uint quantity = (uint)Prompt.ShowDialog("Enter quantity", "Enter quantity");
+                var newLine = new OrderLine((nodeSource.Tag as Item).Clone() as Item, quantity);
 
-            var orderArgs = nodeTarget.Tag as OrderArgs;
-            orderArgs.order.AddOrderLine(newLine);
-            if (!db.EditOrder(orderArgs.customer.ID, orderArgs.order))
-                MessageBox.Show("Ниче не работает", "ашибка");
-
-            LoadCustomerOrders(orderArgs.customer);
+                var orderArgs = nodeTarget.Tag as OrderArgs;
+                orderArgs.order.AddOrderLine(newLine);
+                if (!db.EditOrder(orderArgs.customer.ID, orderArgs.order))
+                    MessageBox.Show("Клиент не найден в базе данных", "Ошибка");
+            }
+            if (nodeSource.Name == "discount" && nodeTarget.Name == "discounts")
+            {
+                var targetArgs = nodeTarget.Tag as OrderArgs;
+                var sourceArgs = nodeSource.Tag as OrderArgs;
+                var result = db.AddDiscount(targetArgs.customer.ID, targetArgs.order.Number, sourceArgs.discount);
+                if (!result.Item1)
+                    ShowDiscountWarning(targetArgs.order.Number, sourceArgs.discount.Name, result.Item2);
+            }
         }
+
 
         private void tree_AfterDoubleClick(object sender, TreeNodeMouseClickEventArgs e)
         {
@@ -236,8 +271,8 @@ namespace Program
             }
         }
 
-        private void customerTree_AfterLabelEdit(object sender,
-                 System.Windows.Forms.NodeLabelEditEventArgs e)
+
+        private void customerTree_AfterLabelEdit(object sender, NodeLabelEditEventArgs e)
         {
             if (e.Label != null)
             {
@@ -266,8 +301,7 @@ namespace Program
             }
         }
 
-        private void customerTree_AfterPhoneEdit(object sender,
-                 System.Windows.Forms.NodeLabelEditEventArgs e)
+        private void customerTree_AfterPhoneEdit(object sender, NodeLabelEditEventArgs e)
         {
             if (e.Label.IndexOfAny(new char[] { '@', '.', ',', '!' }) == -1)
             {
@@ -292,8 +326,7 @@ namespace Program
             }
         }
 
-        private void customerTree_AfterPrivilegeEdit(object sender,
-                 System.Windows.Forms.NodeLabelEditEventArgs e)
+        private void customerTree_AfterPrivilegeEdit(object sender, NodeLabelEditEventArgs e)
         {
             Privilege newStatus;
 
@@ -320,7 +353,7 @@ namespace Program
             }
         }
 
-        private void customerTree_AfterNameEdit(object sender, System.Windows.Forms.NodeLabelEditEventArgs e)
+        private void customerTree_AfterNameEdit(object sender, NodeLabelEditEventArgs e)
         {
             var name = e.Label.Split(' ');
             if (e.Label.IndexOfAny(new char[] { '@', '.', ',', '!' }) == -1 && name.Length == 3)
@@ -350,14 +383,153 @@ namespace Program
             }
         }
 
+
+        private void orderTree_AfterLabelEdit(object sender, NodeLabelEditEventArgs e)
+        {
+            if (e.Label != null)
+            {
+
+                switch (e.Node.Name)
+                {
+                    case "address":
+                        orderTree_AfterAddressEdit(sender, e);
+                        break;
+                    case "date":
+                        orderTree_AfterDateEdit(sender, e);
+                        break;
+                    case "deliveryType":
+                        orderTree_AfterDeliveryTypeEdit(sender, e);
+                        break;
+                    case "quantity":
+                        orderTree_AfterItemQuantityEdit(sender, e);
+                        break;
+
+                    default:
+                        MessageBox.Show("Выбранный пункт нельзя редактировать.\n",
+                           "Редактирование заказов клиента");
+                        e.CancelEdit = true;
+                        e.Node.EndEdit(true);
+                        break;
+                }
+
+            }
+        }
+
+        private void orderTree_AfterAddressEdit(object sender, NodeLabelEditEventArgs e)
+        {
+            if (e.Label.IndexOfAny(new char[] { '@', '!', '?' }) == -1)
+            {
+                // Stop editing without canceling the label change.
+                e.Node.EndEdit(false);
+                var args = e.Node.Tag as OrderArgs;
+                args.order.Address = e.Label;
+
+                if (db.EditOrder(args.customer.ID, args.order))
+                {
+                    MessageBox.Show("Адрес успешно изменен.\n", "Операция успешна");
+                }
+                else
+                    MessageBox.Show("Клиент не найден в базе данных.\n", "Ошибка");
+            }
+            else
+            {
+                e.CancelEdit = true;
+                e.Node.EndEdit(true);
+                MessageBox.Show("Неверный формат адреса.\n" +
+                   "Запрещены символы: '@', '!', '?'",
+                   "Ошибка");
+            }
+        }
+
+        private void orderTree_AfterDateEdit(object sender, NodeLabelEditEventArgs e)
+        {
+            if (e.Label.IndexOfAny(new char[] { '@', '!', '?' }) == -1
+                && DateTimeOffset.TryParse(e.Label, out DateTimeOffset newDate))
+            {
+                e.Node.EndEdit(false);
+                var args = e.Node.Tag as OrderArgs;
+                args.order.CreationDate = newDate;
+
+                if (db.EditOrder(args.customer.ID, args.order))
+                {
+                    MessageBox.Show("Дата формирования заказа успешно изменена.\n", "Операция успешна");
+                }
+                else
+                    MessageBox.Show("Клиент не найден в базе данных.\n", "Ошибка");
+            }
+            else
+            {
+                e.CancelEdit = true;
+                e.Node.EndEdit(true);
+                MessageBox.Show("Неверный формат даты.\n" +
+                   "Требуемый формат: \"dd.mm.yyyy\"",
+                   "Ошибка");
+            }
+        }
+
+        private void orderTree_AfterDeliveryTypeEdit(object sender, NodeLabelEditEventArgs e)
+        {
+            if (e.Label.IndexOfAny(new char[] { '@', '.', ',', '!' }) == -1
+                && Enum.TryParse(e.Label, out DeliveryType newType))
+            {
+                e.Node.EndEdit(false);
+                var args = e.Node.Tag as OrderArgs;
+                args.order.DeliveryType = newType;
+                if (db.EditOrder(args.customer.ID, args.order))
+                    MessageBox.Show("Статус успешно изменен.\n", "Операция успешна");
+                else
+                    MessageBox.Show("Клиент не найден в базе данных.\n", "Ошибка");
+            }
+            else
+            {
+                /* Cancel the label edit action, inform the user, and 
+                   place the node in edit mode again. */
+                e.CancelEdit = true;
+                e.Node.EndEdit(true);
+                MessageBox.Show("Неверный статус доставки.\n" +
+                   "Возможные статусы: 'Standard', 'Express'",
+                   "Ошибка");
+            }
+        }
+
+        private void orderTree_AfterItemQuantityEdit(object sender, NodeLabelEditEventArgs e)
+        {
+            if (e.Label.IndexOfAny(new char[] { '@', '.', ',', '!' }) == -1
+                && uint.TryParse(e.Label, out uint newAmount))
+            {
+                e.Node.EndEdit(false);
+                var args = e.Node.Tag as OrderArgs;
+                args.order.SetItemQuantity(args.orderLine.Item, newAmount);
+                if (db.EditOrder(args.customer.ID, args.order))
+                    MessageBox.Show("Количество успешно изменено.\n", "Операция успешна");
+                else
+                    MessageBox.Show("Клиент не найден в базе данных.\n", "Ошибка");
+            }
+            else
+            {
+                /* Cancel the label edit action, inform the user, and 
+                   place the node in edit mode again. */
+                e.CancelEdit = true;
+                e.Node.EndEdit(true);
+                MessageBox.Show("Вы ввели не целое число.\n", "Ошибка");
+            }
+        }
+
+
         private void DrawCustomerNode(object sender, DrawTreeNodeEventArgs e)
         {
             var tree = sender as TreeView;
+            var font = e.Node.NodeFont;
+            if (font == null)
+                font = new Font("Arial", 10);
+
+            //TextRenderer.DrawText()
             TextRenderer.DrawText(e.Graphics,
                 e.Node.Text,
-                e.Node.NodeFont,
+                font,
                 new Point(e.Node.Bounds.Left, e.Node.Bounds.Top),
-                tree.SelectedNode == e.Node && tree.Focused ? SystemColors.HighlightText : SystemColors.WindowText);
+                tree.SelectedNode == e.Node && tree.Focused ? SystemColors.HighlightText : SystemColors.WindowText,
+                tree.SelectedNode == e.Node && tree.Focused ? SystemColors.Highlight : SystemColors.Window);
         }
 
         private void CreateMenu()
@@ -400,17 +572,16 @@ namespace Program
 
         private void CreateContextMenu()
         {
-            #region ContextMenu
             orderContextMenu = new ContextMenu();
             var deleteOrderItem = new MenuItem("Удалить заказ");
             deleteOrderItem.Click += (sender, args) =>
             {
-                if (ordersTree.SelectedNode != null)
-                    if (ordersTree.SelectedNode.Name == "number")
+                if (orderTree.SelectedNode != null)
+                    if (orderTree.SelectedNode.Name == "number")
                     {
-                        var orderArgs = ordersTree.SelectedNode.Tag as OrderArgs;
+                        var orderArgs = orderTree.SelectedNode.Tag as OrderArgs;
                         orderArgs.customer.OrderManager.Remove(orderArgs.order.Number);
-                        LoadCustomerOrders(orderArgs.customer);
+                        db.EditOrder(orderArgs.customer.ID, orderArgs.order);
                     }
             };
             orderContextMenu.MenuItems.Add(deleteOrderItem);
@@ -419,12 +590,12 @@ namespace Program
             var deleteOrderLineItem = new MenuItem("Удалить товар из заказа");
             deleteOrderLineItem.Click += (sender, args) =>
             {
-                if (ordersTree.SelectedNode != null)
-                    if (ordersTree.SelectedNode.Name == "item")
+                if (orderTree.SelectedNode != null)
+                    if (orderTree.SelectedNode.Name == "item")
                     {
-                        var orderArgs = ordersTree.SelectedNode.Tag as OrderArgs;
+                        var orderArgs = orderTree.SelectedNode.Tag as OrderArgs;
                         orderArgs.order.DeleteItem(orderArgs.orderLine.Item);
-                        LoadCustomerOrders(orderArgs.customer);
+                        db.EditOrder(orderArgs.customer.ID, orderArgs.order);
                     }
             };
             orderLineContextMenu.MenuItems.Add(deleteOrderLineItem);
@@ -433,10 +604,10 @@ namespace Program
             var deleteItemItem = new MenuItem("Удалить товар из каталога");
             deleteItemItem.Click += (sender, args) =>
             {
-                if (itemsTree.SelectedNode != null)
-                    if (itemsTree.SelectedNode.Name == "item")
+                if (itemTree.SelectedNode != null)
+                    if (itemTree.SelectedNode.Name == "item")
                     {
-                        var item = itemsTree.SelectedNode.Tag as Item;
+                        var item = itemTree.SelectedNode.Tag as Item;
                         db.DeleteItem(item);
                     }
             };
@@ -448,19 +619,41 @@ namespace Program
             {
                 if (customerTree.SelectedNode != null)
                     if (customerTree.SelectedNode.Name == "name")
-                        LoadCustomerOrders(customerTree.SelectedNode.Tag as Customer);
+                    {
+                        var customer = customerTree.SelectedNode.Tag as Customer;
+                        LoadCustomerOrders(db.GetCustomer(customer.ID));
+                    }
             };
             userContextMenu.MenuItems.Add(editOrdersItem);
-            #endregion
+
+            discountContextMenu = new ContextMenu();
+            var deleteDiscountItem = new MenuItem("Удалить скидку");
+            deleteDiscountItem.Click += (sender, args) =>
+            {
+                if (orderTree.SelectedNode != null)
+                    if (orderTree.SelectedNode.Name == "discount")
+                    {
+                        var orderArgs = orderTree.SelectedNode.Tag as OrderArgs;
+                        orderArgs.order.discounts.Remove(orderArgs.discount.Family);
+                        db.EditOrder(orderArgs.customer.ID, orderArgs.order);
+                    }
+            };
+            discountContextMenu.MenuItems.Add(deleteDiscountItem);
         }
 
         private void CreateWindowControls()
         {
-            #region WINDOW CONTROLS
-
             customersLabel = new Label()
             {
                 Text = "Покупатели",
+                TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
+                Font = new Font("Arial", 12, FontStyle.Bold),
+                Dock = DockStyle.Fill
+            };
+
+            discountLabel = new Label()
+            {
+                Text = "Скидки",
                 TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
                 Font = new Font("Arial", 12, FontStyle.Bold),
                 Dock = DockStyle.Fill
@@ -493,30 +686,21 @@ namespace Program
 
             addOrderButton.Click += (sender, args) =>
             {
-                if (ordersTree.Nodes.Count != 0)
+                if (orderTree.Nodes.Count != 0)
                 {
-                    var orderArgs = ordersTree.Nodes[0].Tag as OrderArgs;
+                    var orderArgs = orderTree.Nodes[0].Tag as OrderArgs;
                     CreateOrder(orderArgs.customer);
-                    LoadCustomerOrders(orderArgs.customer);
+                    LoadCustomerOrders(db.GetCustomer(orderArgs.customer.ID));
                 }
                 else MessageBox.Show(
                     "Сначала выберите клиента в левой части окна,\nщелкнув по нему правой кнопкой мыши и выбрав\n\"Редактировать заказы\"",
                     "Сообщение");
             };
 
-            orderTable = new TableLayoutPanel();
-            orderTable.Dock = DockStyle.Fill;
-            orderTable.RowStyles.Clear();
-            orderTable.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            orderTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            orderTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 40));
-            orderTable.Controls.Add(orderLabel, 0, 0);
-            orderTable.Controls.Add(addOrderButton, 1, 0);
-            #endregion
         }
 
         private void CreateTrees()
-        {            
+        {
             customerTree = new BufferedTreeView()
             {
                 Dock = DockStyle.Fill,
@@ -524,48 +708,78 @@ namespace Program
                 CausesValidation = false
             };
 
-            itemsTree = new BufferedTreeView()
+            itemTree = new BufferedTreeView()
+            {
+                Dock = DockStyle.Fill,
+                ShowNodeToolTips = true
+            };
+
+            orderTree = new BufferedTreeView()
             {
                 Dock = DockStyle.Fill,
                 ShowNodeToolTips = true,
                 AllowDrop = true
             };
 
-            ordersTree = new BufferedTreeView()
+            discountTree = new BufferedTreeView()
             {
                 Dock = DockStyle.Fill,
-                ShowNodeToolTips = true,
-                AllowDrop = true
+                ShowNodeToolTips = true
             };
 
             customerTree.NodeMouseDoubleClick += (sender, args) => tree_AfterDoubleClick(sender, args);
             customerTree.AfterLabelEdit += (sender, args) => customerTree_AfterLabelEdit(sender, args);
             customerTree.NodeMouseClick += (sender, args) => customerTree.SelectedNode = args.Node;
 
-            itemsTree.ItemDrag += (sender, args) => tree_BeginDrag(sender, args);
+            itemTree.ItemDrag += (sender, args) => tree_BeginDrag(sender, args);
             //itemsTree.DragOver += (sender, args) => tree_DragOver(sender, args);
             //itemsTree.DragDrop += (sender, args) => tree_EndDrag(sender, args);
             //itemsTree.NodeMouseDoubleClick += (sender, args) => tree_AfterDoubleClick(sender, args);
-            itemsTree.NodeMouseClick += (sender, args) => itemsTree.SelectedNode = args.Node;
+            itemTree.NodeMouseClick += (sender, args) => itemTree.SelectedNode = args.Node;
 
             //ordersTree.ItemDrag += (sender, args) => tree_BeginDrag(sender, args);
-            ordersTree.DragOver += (sender, args) => tree_DragOver(sender, args);
-            ordersTree.DragDrop += (sender, args) => tree_EndDrag(sender, args);
-            ordersTree.NodeMouseClick += (sender, args) => ordersTree.SelectedNode = args.Node;
-            //ordersTree.NodeMouseDoubleClick += (sender, args) => tree_AfterDoubleClick(sender, args);
+            orderTree.DragOver += (sender, args) => tree_DragOver(sender, args);
+            orderTree.DragDrop += (sender, args) => orderTree_EndItemDrag(sender, args);
+            orderTree.NodeMouseClick += (sender, args) => orderTree.SelectedNode = args.Node;
+            orderTree.NodeMouseDoubleClick += (sender, args) => tree_AfterDoubleClick(sender, args);
+            orderTree.AfterLabelEdit += (sender, args) => orderTree_AfterLabelEdit(sender, args);
+
+            discountTree.ItemDrag += (sender, args) => tree_BeginDrag(sender, args);
+            discountTree.NodeMouseClick += (sender, args) => discountTree.SelectedNode = args.Node;
 
             customerTree.DrawMode = TreeViewDrawMode.OwnerDrawText;
-            itemsTree.DrawMode = TreeViewDrawMode.OwnerDrawText;
-            ordersTree.DrawMode = TreeViewDrawMode.OwnerDrawText;
-
+            itemTree.DrawMode = TreeViewDrawMode.OwnerDrawText;
+            orderTree.DrawMode = TreeViewDrawMode.OwnerDrawText;
+            discountTree.DrawMode = TreeViewDrawMode.OwnerDrawText;
             customerTree.DrawNode += (sender, args) => DrawCustomerNode(sender, args);
-            itemsTree.DrawNode += (sender, args) => DrawCustomerNode(sender, args);
-            ordersTree.DrawNode += (sender, args) => DrawCustomerNode(sender, args);
+            itemTree.DrawNode += (sender, args) => DrawCustomerNode(sender, args);
+            orderTree.DrawNode += (sender, args) => DrawCustomerNode(sender, args);
+            discountTree.DrawNode += (sender, args) => DrawCustomerNode(sender, args);
         }
 
         private void CreateLayout()
         {
-            #region LAYOUT
+            //Супер кривое решение, но переделывать просто сил уже нет
+            middleTable = new TableLayoutPanel();
+            middleTable.Dock = DockStyle.Fill;
+            middleTable.RowStyles.Clear();
+            middleTable.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+            middleTable.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
+            middleTable.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+            middleTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            middleTable.Controls.Add(itemTree, 0, 0);
+            middleTable.Controls.Add(discountLabel, 0, 1);
+            middleTable.Controls.Add(discountTree, 0, 2);
+
+            orderHeaderTable = new TableLayoutPanel();
+            orderHeaderTable.Dock = DockStyle.Fill;
+            orderHeaderTable.RowStyles.Clear();
+            orderHeaderTable.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            orderHeaderTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            orderHeaderTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 40));
+            orderHeaderTable.Controls.Add(orderLabel, 0, 0);
+            orderHeaderTable.Controls.Add(addOrderButton, 1, 0);
+
             mainTable = new TableLayoutPanel();
             mainTable.RowStyles.Clear();
             mainTable.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
@@ -576,16 +790,16 @@ namespace Program
 
             mainTable.Controls.Add(customersLabel, 0, 0);
             mainTable.Controls.Add(itemsLabel, 1, 0);
-            mainTable.Controls.Add(orderTable, 2, 0);
+            mainTable.Controls.Add(orderHeaderTable, 2, 0);
             mainTable.Controls.Add(customerTree, 0, 1);
-            mainTable.Controls.Add(itemsTree, 1, 1);
-            mainTable.Controls.Add(ordersTree, 2, 1);
+            mainTable.Controls.Add(middleTable, 1, 1);
+            mainTable.Controls.Add(orderTree, 2, 1);
 
             mainTable.Dock = DockStyle.Fill;
             mainTable.CellBorderStyle = TableLayoutPanelCellBorderStyle.Inset;
 
             Controls.Add(mainTable);
-            #endregion
+
         }
 
         public MainForm()
@@ -595,19 +809,15 @@ namespace Program
             CreateContextMenu();
             CreateWindowControls();
             CreateTrees();
-            CreateLayout();            
+            CreateLayout();
 
             InitializeDB(false);
             LoadCustomersFromFile("CUSTOMERS.DAT");
             LoadItemsFromFile("ITEMS.DAT");
             UpdateView();
 
-            //Shown += (sender, args) => InitializeDB(false);
-            //Shown += (sender, args) => LoadCustomersFromFile("CUSTOMERS.DAT");
-            //Shown += (sender, args) => LoadItemsFromFile("ITEMS.DAT");
-            //Shown += (sender, args) => UpdateView();
-
             db.StateChanged += UpdateView;
+            db.DiscountDenied += ShowDiscountWarning;
         }
 
 

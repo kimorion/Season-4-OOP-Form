@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Program.Model
+namespace Program.Promotion
 {
-    public abstract class Discount
+    public abstract class Discount : ICloneable
     {
         public readonly string Family;
         public string Name { get; protected set; }
@@ -50,10 +50,14 @@ namespace Program.Model
             return Tuple.Create(true, "Скидка разрешена");
         }
 
-
         protected Tuple<bool, string> Refusal(string reason)
         {
             return Tuple.Create(false, reason);
+        }
+
+        public object Clone()
+        {
+            return MemberwiseClone();
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using System;
+using Program.Promotion;
 
-namespace Program.Model
+namespace Program.Promotion
 {
     public class WinterDiscount : Discount
     {

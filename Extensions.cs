@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Program.Promotion;
 
 namespace Program
 {
@@ -18,7 +19,6 @@ namespace Program
 
         public static Dictionary<TKey, TValue> Clone<TKey, TValue>(this Dictionary<TKey, TValue> dicToClone)
             where TValue : class, ICloneable
-            where TKey : unmanaged
         {
             var result = new Dictionary<TKey, TValue>();
             foreach (var item in dicToClone)

@@ -1,13 +1,13 @@
-﻿using Program.Model;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Program.Promotion;
 
 namespace Program
 {
-    public enum DeliveryType { Stardard, Express }
+    public enum DeliveryType { Standard, Express }
 
     public class Order : ICloneable
     {
@@ -15,7 +15,7 @@ namespace Program
         public Dictionary<string, Discount> discounts = new Dictionary<string, Discount>();
 
         public string Address { get; set; }
-        public DateTimeOffset CreationDate { get; private set; } = new DateTimeOffset();
+        public DateTimeOffset CreationDate { get; set; } = new DateTimeOffset();
         public DeliveryType DeliveryType { get; set; }
         public int Number { get; private set; }
         public IEnumerable<OrderLine> OrderLines
@@ -41,8 +41,20 @@ namespace Program
                 }
 
                 if (DeliveryType == DeliveryType.Express) result *= 1.25;
-
                 return result;
+            }
+        }
+
+        public double TotalDiscount
+        {
+            get
+            {
+                double discountAmount = 0;
+                foreach (var discount in discounts.Values)
+                {
+                    discountAmount += discount.GetDiscountAmount(this);
+                }
+                return discountAmount;
             }
         }
 
@@ -114,7 +126,8 @@ namespace Program
                 Number = Number,
                 DeliveryType = DeliveryType,
                 CreationDate = CreationDate,
-                orderLines = orderLines.Clone() as HashSet<OrderLine>
+                orderLines = orderLines.Clone() as HashSet<OrderLine>,
+                discounts = discounts.Clone() as Dictionary<string, Discount>
             };
         }
     }

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using Program.Promotion;
 
 namespace Program
 {
@@ -12,6 +13,7 @@ namespace Program
         public Customer customer;
         public Order order;
         public OrderLine orderLine;
+        public Promotion.Discount discount;
 
         public OrderArgs(Customer customer, Order order, OrderLine line)
         {
@@ -31,13 +33,20 @@ namespace Program
         {
             this.orderLine = line;
         }
+        public OrderArgs(OrderArgs args)
+        {
+            this.customer = args.customer;
+            this.order = args.order;
+            this.orderLine = args.orderLine;
+            this.discount = args.discount;
+        }
         public OrderArgs() { }
 
     }
 
     public class TreeViewGenerator
     {
-        public void GenerateCustomersTree(TreeView customerTree, List<Customer> customers,
+        public void GenerateCustomerTree(TreeView customerTree, List<Customer> customers,
             ContextMenu menu)
         {
             customerTree.BeginUpdate();
@@ -81,7 +90,7 @@ namespace Program
             customerTree.EndUpdate();
         }
 
-        public void GenerateItemsTree(TreeView itemsTree, List<Item> items,
+        public void GenerateItemTree(TreeView itemsTree, List<Item> items,
             ContextMenu itemMenu)
         {
             itemsTree.BeginUpdate();
@@ -92,7 +101,7 @@ namespace Program
                 itemRoot.ContextMenu = itemMenu;
                 itemRoot.Name = "item";
                 itemRoot.Nodes.Add("Name: " + item.Name);
-                itemRoot.Nodes.Add("Price: " + item.UnitPrice.ToString());
+                itemRoot.Nodes.Add("Price: " + item.UnitPrice.ToString("0.00"));
                 itemRoot.Tag = item;
                 itemsTree.Nodes.Add(itemRoot);
             }
@@ -120,7 +129,7 @@ namespace Program
             lineRoot.Nodes.Add(new TreeNode()
             {
                 Name = "unitPrice",
-                Text = args.orderLine.Item.UnitPrice.ToString(),
+                Text = args.orderLine.Item.UnitPrice.ToString("0.00"),
                 ToolTipText = "Цена за единицу товара",
                 Tag = args
             });
@@ -136,21 +145,22 @@ namespace Program
             lineRoot.Nodes.Add(new TreeNode()
             {
                 Name = "orderLinePrice",
-                Text = args.orderLine.Cost.ToString(),
+                Text = args.orderLine.Cost.ToString("0.00"),
                 ToolTipText = "Цена строки заказа"
             });
 
             return lineRoot;
         }
 
-        public TreeNode GenerateOrderNode(OrderArgs args)
+        public TreeNode GenerateOrderNode(OrderArgs args, ContextMenu discountContextMenu)
         {
             var orderRoot = new TreeNode()
             {
                 Name = "number",
                 Text = args.order.Number.ToString(),
                 ToolTipText = "Уникальный номер заказа",
-                Tag = args
+                Tag = args,
+                NodeFont = new System.Drawing.Font("Arial", 10, System.Drawing.FontStyle.Bold)
             };
 
             orderRoot.Nodes.Add(new TreeNode()
@@ -163,7 +173,7 @@ namespace Program
             orderRoot.Nodes.Add(new TreeNode()
             {
                 Name = "date",
-                Text = args.order.CreationDate.ToString(),
+                Text = args.order.CreationDate.ToString("dd.MM.yyyy"),
                 ToolTipText = "Дата оформления заказа",
                 Tag = args
             });
@@ -175,11 +185,53 @@ namespace Program
                 Tag = args
             });
 
+            var discountRoot = new TreeNode()
+            {
+                Name = "discounts",
+                Text = "Примененные скидки",
+                ToolTipText = "Скидки, примененные к заказу",
+                Tag = args
+            };
+
+            foreach (var discount in args.order.discounts.Values)
+            {
+                discountRoot.Nodes.Add(new TreeNode()
+                {
+                    Name = "discount",
+                    Text = discount.Name + " : " + discount.GetDiscountAmount(args.order).ToString("0.00"),
+                    ToolTipText = discount.Description,
+                    Tag = new OrderArgs(args) { discount = discount },
+                    ContextMenu = discountContextMenu
+                });
+            }
+            orderRoot.Nodes.Add(discountRoot);
+
+            orderRoot.Nodes.Add(new TreeNode()
+            {
+                Name = "totalCost",
+                Text = "Суммарная стоимость заказа: " + args.order.TotalCost.ToString("0.00"),
+                ToolTipText = "Стоимость заказа"
+            });
+
+            orderRoot.Nodes.Add(new TreeNode()
+            {
+                Name = "totalDiscount",
+                Text = "Суммарная скидка на заказ: " + args.order.TotalDiscount.ToString("0.00"),
+                ToolTipText = "Суммарная скидка"
+            });
+            orderRoot.Nodes.Add(new TreeNode()
+            {
+                Name = "totalDiscount",
+                Text = "Итоговая цена заказа: " + (args.order.TotalCost - args.order.TotalDiscount).ToString("0.00"),
+                ToolTipText = "Итоговая стоимость заказа",
+                NodeFont = new System.Drawing.Font("Arial", 10, System.Drawing.FontStyle.Bold)
+            }); ;
+
             return orderRoot;
         }
 
-        public void GenerateOrdersTree(TreeView ordersTree, Customer customer,
-            ContextMenu orderMenu, ContextMenu orderLineMenu)
+        public void GenerateOrderTree(TreeView ordersTree, Customer customer,
+            ContextMenu orderMenu, ContextMenu orderLineMenu, ContextMenu discountContextMenu)
         {
             ordersTree.BeginUpdate();
             ordersTree.Nodes.Clear();
@@ -202,7 +254,7 @@ namespace Program
 
             foreach (var order in customer.OrderManager.Orders)
             {
-                var orderRoot = GenerateOrderNode(new OrderArgs(customer, order, null));
+                var orderRoot = GenerateOrderNode(new OrderArgs(customer, order, null), discountContextMenu);
                 orderRoot.ContextMenu = orderMenu;
 
                 var orderLinesRoot = new TreeNode()
@@ -227,6 +279,23 @@ namespace Program
                 ordersTree.Nodes.Add(orderRoot);
             }
             ordersTree.EndUpdate();
+        }
+
+        public void GenerateDiscountTree(TreeView tree, List<Discount> discounts)
+        {
+            tree.BeginUpdate();
+            tree.Nodes.Clear();
+            foreach (var discount in discounts)
+            {
+                tree.Nodes.Add(new TreeNode()
+                {
+                    Name = "discount",
+                    Text = discount.Name,
+                    ToolTipText = discount.Description,
+                    Tag = new OrderArgs() { discount = discount }
+                });
+            }
+            tree.EndUpdate();
         }
     }
 }

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Program.Model
+namespace Program.Promotion
 {
     public class OrderCostPremiumDiscount_1d5K : OrderCostDiscount_1d5K
     {

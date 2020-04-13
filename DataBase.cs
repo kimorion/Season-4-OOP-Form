@@ -4,16 +4,20 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Collections;
+using Program.Promotion;
 
 namespace Program
 {
+    public delegate void DiscountEventHandler(int orderNumber, string discountName, string reason);
 
     class DataBase
     {
         public event Action StateChanged;
+        public event DiscountEventHandler DiscountDenied;
 
         private Dictionary<string, Customer> customers;
         private Dictionary<string, Item> items;
+        private List<Discount> discounts;
 
         public bool IsAvailable
         {
@@ -24,6 +28,13 @@ namespace Program
         {
             customers = new Dictionary<string, Customer>();
             items = new Dictionary<string, Item>();
+            discounts = new List<Discount>();
+
+            discounts.Add(new OrderCostDiscount_1K());
+            discounts.Add(new OrderCostDiscount_1d5K());
+            discounts.Add(new OrderCostPremiumDiscount_1d5K());
+            discounts.Add(new PremiumCustomerDiscount());
+            discounts.Add(new WinterDiscount());
         }
 
         public void Reset()
@@ -31,6 +42,28 @@ namespace Program
             customers = null;
             items = null;
         }
+
+        public void CheckCustomerDiscounts(string id)
+        {
+            if (!customers.TryGetValue(id, out Customer customer))
+                throw new KeyNotFoundException();
+            foreach (var order in customer.OrderManager.Orders)
+            {
+                Dictionary<string, Discount> oldDiscounts = order.discounts;
+                order.discounts = new Dictionary<string, Discount>();
+
+                foreach (var discount in oldDiscounts.Values)
+                {
+                    var checkResult = discount.Check(customer, order);
+                    if (!checkResult.Item1)
+                    {
+                        DiscountDenied?.Invoke(order.Number, discount.Name, checkResult.Item2);
+                    }
+                    else order.discounts.Add(discount.Family, discount);
+                }
+            }
+        }
+
 
         public void AddCustomer(Customer customer)
         {
@@ -41,6 +74,42 @@ namespace Program
             customers.Add(customer.ID, customer);
             StateChanged?.Invoke();
         }
+
+        public Customer GetCustomer(string id)
+        {
+            customers.TryGetValue(id, out Customer customer);
+            return customer?.Clone() as Customer;
+        }
+
+        public bool EditCustomer(Customer customer)
+        {
+            if (!customers.TryGetValue(customer.ID, out Customer result))
+            {
+                return false;
+            }
+
+            customers[customer.ID] = customer.Clone() as Customer;
+            CheckCustomerDiscounts(customer.ID);
+            StateChanged?.Invoke();
+            return true;
+        }
+
+        public List<Customer> GetCustomers()
+        {
+            return customers.Values.ToList().Clone() as List<Customer>;
+        }
+
+        public IEnumerable<Customer> Customers
+        {
+            get
+            {
+                foreach (var customer in customers)
+                {
+                    yield return customer.Value.Clone() as Customer;
+                }
+            }
+        }
+
 
         public void AddItem(Item item)
         {
@@ -53,34 +122,10 @@ namespace Program
             StateChanged?.Invoke();
         }
 
-        public Customer GetCustomer(string code)
-        {
-            customers.TryGetValue(code, out Customer customer);
-            return customer?.Clone() as Customer;
-        }
-
         public Item GetItem(string article)
         {
             items.TryGetValue(article, out Item item);
             return item?.Clone() as Item;
-        }
-
-        /// <summary>
-        /// Searches a db with a code of the given customer,  
-        /// and if it finds it, it will replace it with a clone of the given customer.
-        /// </summary>
-        /// <param name="customer">Edited customer</param>
-        /// <returns>Operation status</returns>
-        public bool EditCustomer(Customer customer)
-        {
-            if (!customers.TryGetValue(customer.ID, out Customer result))
-            {
-                return false;
-            }
-
-            customers[customer.ID] = customer.Clone() as Customer;
-            StateChanged?.Invoke();
-            return true;
         }
 
         public bool EditItem(Item item)
@@ -95,32 +140,6 @@ namespace Program
             return true;
         }
 
-        public bool EditOrder(string customerID, Order order)
-        {
-            if (!customers.TryGetValue(customerID, out Customer customer))
-            {
-                return false;
-            }
-            if (!customer.OrderManager.TryGetOrder(order.Number, out Order originalOrder))
-            {
-                return false;
-            }
-            customer.OrderManager.EditOrder(order.Clone() as Order);
-            StateChanged?.Invoke();
-            return true;
-        }
-
-        public IEnumerable<Customer> Customers
-        {
-            get
-            {
-                foreach (var customer in customers)
-                {
-                    yield return customer.Value.Clone() as Customer;
-                }
-            }
-        }
-
         public IEnumerable<Item> Items
         {
             get
@@ -130,11 +149,6 @@ namespace Program
                     yield return item.Value.Clone() as Item;
                 }
             }
-        }
-
-        public List<Customer> GetCustomers()
-        {
-            return customers.Values.ToList().Clone() as List<Customer>;
         }
 
         public List<Item> GetItems()
@@ -151,5 +165,51 @@ namespace Program
             }
             return false;
         }
+
+
+        public bool EditOrder(string customerID, Order order)
+        {
+            if (!customers.TryGetValue(customerID, out Customer customer))
+            {
+                return false;
+            }
+            if (!customer.OrderManager.TryGetOrder(order.Number, out Order originalOrder))
+            {
+                return false;
+            }
+            customer.OrderManager.EditOrder(order.Clone() as Order);
+            CheckCustomerDiscounts(customerID);
+            StateChanged?.Invoke();
+            return true;
+        }
+
+
+        public List<Discount> GetDiscounts()
+        {
+            return discounts;
+        }
+
+        public Tuple<bool, string> AddDiscount(string customerID, int orderNumber, Discount discount)
+        {
+            if (!customers.TryGetValue(customerID, out Customer customer))
+                throw new Exception("Customer not found in the DB");
+
+            if (!customer.OrderManager.TryGetOrder(orderNumber, out Order order))
+                throw new Exception("Order with the specified number was not found");
+
+            var checkResult = discount.Check(customer, order);
+            if (!checkResult.Item1)
+                return checkResult;
+
+            if (order.discounts.TryGetValue(discount.Family, out Discount discount1))
+            {
+                DiscountDenied?.Invoke(order.Number, discount1.Name, checkResult.Item2);
+                order.discounts.Remove(discount.Family);
+            }
+            order.discounts.Add(discount.Family, discount);
+            StateChanged?.Invoke();
+            return checkResult;
+        }
+
     }
 }

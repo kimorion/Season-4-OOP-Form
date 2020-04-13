@@ -1,12 +1,13 @@
 ﻿using System;
+using Program.Promotion;
 
-namespace Program.Model
+namespace Program.Promotion
 {
     public class OrderCostDiscount_1K : Discount
     {
         public OrderCostDiscount_1K() : base("CostBasedDiscount")
         {
-            Name = "Скидка по стоимости заказа";
+            Name = "Скидка для заказов от 1000р.";
             Description = "Скидка в 5% для заказов от 1000р. ";
         }
 
