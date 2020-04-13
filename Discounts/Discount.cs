@@ -11,6 +11,7 @@ namespace Program.Promotion
         public readonly string Family;
         public string Name { get; protected set; }
         public string Description { get; protected set; }
+        public string[] exclusiveDiscountFamilies { get; protected set; }
 
         public Discount(string family) { this.Family = family; }
 
@@ -19,7 +20,7 @@ namespace Program.Promotion
             return Name;
         }
 
-        public virtual Tuple<bool, string> Check(Customer customer, Order order, params string[] exclusiveDiscountFamilies)
+        public virtual Tuple<bool, string> Check(Customer customer, Order order)
         {
             if (exclusiveDiscountFamilies != null)
                 foreach (var family in exclusiveDiscountFamilies)

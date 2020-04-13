@@ -8,33 +8,39 @@ using Program.Promotion;
 
 namespace Program
 {
-    public delegate void DiscountEventHandler(int orderNumber, string discountName, string reason);
+    public delegate void DiscountEventHandler(uint orderNumber, string discountName, string reason);
 
     class DataBase
     {
         public event Action StateChanged;
         public event DiscountEventHandler DiscountDenied;
+        public event Action<string> UserWarning;
 
         private Dictionary<string, Customer> customers;
         private Dictionary<string, Item> items;
-        private List<Discount> discounts;
+        private Dictionary<string, Discount> discounts;
 
         public bool IsAvailable
         {
             get { return customers != null && items != null; }
         }
 
+        private void InitializeDiscount(Discount discount)
+        {
+            discounts.Add(discount.Name, discount);
+        }
+
         public void Initialize()
         {
             customers = new Dictionary<string, Customer>();
             items = new Dictionary<string, Item>();
-            discounts = new List<Discount>();
+            discounts = new Dictionary<string, Discount>();
 
-            discounts.Add(new OrderCostDiscount_1K());
-            discounts.Add(new OrderCostDiscount_1d5K());
-            discounts.Add(new OrderCostPremiumDiscount_1d5K());
-            discounts.Add(new PremiumCustomerDiscount());
-            discounts.Add(new WinterDiscount());
+            InitializeDiscount(new OrderCostDiscount_1K());
+            InitializeDiscount(new OrderCostDiscount_1d5K());
+            InitializeDiscount(new OrderCostPremiumDiscount_1d5K());
+            InitializeDiscount(new PremiumCustomerDiscount());
+            InitializeDiscount(new WinterDiscount());
         }
 
         public void Reset()
@@ -64,6 +70,76 @@ namespace Program
             }
         }
 
+        // Customer
+
+        public bool TryEditPrivilege(string id, Privilege newPrivilege)
+        {
+            if (!customers.TryGetValue(id, out Customer customer))
+            {
+                UserWarning?.Invoke("Клиент с указанным id не найден в базе");
+                return false;
+            }
+
+            customer.Privilege = newPrivilege;
+            CheckCustomerDiscounts(id);
+            StateChanged?.Invoke();
+            return true;
+        }
+
+        public bool TryEditName(string id, FullName name)
+        {
+            if (!customers.TryGetValue(id, out Customer customer))
+            {
+                UserWarning?.Invoke("Клиент с указанным id не найден в базе");
+                return false;
+            }
+
+            customer.Name = name;
+            StateChanged?.Invoke();
+            return true;
+        }
+
+        public bool TryEditPhoneNumber(string id, string newNumber)
+        {
+            if (!customers.TryGetValue(id, out Customer customer))
+            {
+                UserWarning?.Invoke("Клиент с указанным id не найден в базе");
+                return false;
+            }
+
+            customer.ContactPhone = newNumber;
+            StateChanged?.Invoke();
+            return true;
+        }
+
+        public bool TryAddOrder(string id, Order order)
+        {
+            if (!customers.TryGetValue(id, out Customer customer))
+            {
+                UserWarning?.Invoke("Клиент с указанным id не найден в базе");
+                return false;
+            }
+            customer.OrderManager.AddOrder(order);
+            StateChanged?.Invoke();
+            return true;
+        }
+
+        public bool TryDeleteOrder(string id, uint orderNumber)
+        {
+            if (!customers.TryGetValue(id, out Customer customer))
+            {
+                UserWarning?.Invoke("Клиент с указанным id не найден в базе");
+                return false;
+            }
+            if (!customer.OrderManager.ContainsOrder(orderNumber))
+            {
+                UserWarning?.Invoke("У клиента нет заказа с указанным номером");
+                return false;
+            }
+            customer.OrderManager.Remove(orderNumber);
+            StateChanged?.Invoke();
+            return true;
+        }
 
         public void AddCustomer(Customer customer)
         {
@@ -75,23 +151,11 @@ namespace Program
             StateChanged?.Invoke();
         }
 
-        public Customer GetCustomer(string id)
+        public bool TryGetCustomer(string id, out Customer customer)
         {
-            customers.TryGetValue(id, out Customer customer);
-            return customer?.Clone() as Customer;
-        }
-
-        public bool EditCustomer(Customer customer)
-        {
-            if (!customers.TryGetValue(customer.ID, out Customer result))
-            {
-                return false;
-            }
-
-            customers[customer.ID] = customer.Clone() as Customer;
-            CheckCustomerDiscounts(customer.ID);
-            StateChanged?.Invoke();
-            return true;
+            var result = customers.TryGetValue(id, out Customer original);
+            customer = original?.Clone() as Customer;
+            return result;
         }
 
         public List<Customer> GetCustomers()
@@ -110,6 +174,8 @@ namespace Program
             }
         }
 
+
+        // Item
 
         public void AddItem(Item item)
         {
@@ -166,50 +232,263 @@ namespace Program
             return false;
         }
 
+        // Order
 
-        public bool EditOrder(string customerID, Order order)
+        public bool TryAddItemToOrder(string id, uint orderNumber, string itemArticle, uint quantity)
         {
-            if (!customers.TryGetValue(customerID, out Customer customer))
+            if (!customers.TryGetValue(id, out Customer customer))
             {
+                UserWarning?.Invoke("Клиент с указанным id не найден в базе");
                 return false;
             }
-            if (!customer.OrderManager.TryGetOrder(order.Number, out Order originalOrder))
+
+            if (!customer.OrderManager.TryGetOrder(orderNumber, out Order order))
             {
+                UserWarning?.Invoke("Заказ с указанным номером не найден в базе");
                 return false;
             }
-            customer.OrderManager.EditOrder(order.Clone() as Order);
-            CheckCustomerDiscounts(customerID);
+
+            if (order.state != OrderState.Formation)
+            {
+                UserWarning?.Invoke("Состав заказа можно менять только во время формирования заказа");
+                return false;
+            }
+
+            if (!items.TryGetValue(itemArticle, out Item item))
+            {
+                UserWarning?.Invoke("В базе нет товара с данным артикулом");
+                return false;
+            }
+
+            order.AddItem(item, quantity);
+            CheckCustomerDiscounts(id);
             StateChanged?.Invoke();
             return true;
         }
 
+        public bool TryDeleteItemFromOrder(string id, uint orderNumber, string itemArticle)
+        {
+            if (!customers.TryGetValue(id, out Customer customer))
+            {
+                UserWarning?.Invoke("Клиент с указанным id не найден в базе");
+                return false;
+            }
+
+            if (!customer.OrderManager.TryGetOrder(orderNumber, out Order order))
+            {
+                UserWarning?.Invoke("Заказ с указанным номером не найден в базе");
+                return false;
+            }
+
+            if (order.state != OrderState.Formation)
+            {
+                UserWarning?.Invoke("Состав заказа можно менять только во время формирования заказа");
+                return false;
+            }
+
+            if (!items.TryGetValue(itemArticle, out Item item))
+            {
+                UserWarning?.Invoke("В базе нет товара с данным артикулом");
+                return false;
+            }
+
+            order.DeleteItem(item);
+            CheckCustomerDiscounts(id);
+            StateChanged?.Invoke();
+            return true;
+        }
+
+        public bool TryEditItemQuantity(string id, uint orderNumber, string itemArticle, uint newQuantity)
+        {
+            if (!customers.TryGetValue(id, out Customer customer))
+            {
+                UserWarning?.Invoke("Клиент с указанным id не найден в базе");
+                return false;
+            }
+
+            if (!customer.OrderManager.TryGetOrder(orderNumber, out Order order))
+            {
+                UserWarning?.Invoke("Заказ с указанным номером не найден в базе");
+                return false;
+            }
+
+            if (order.state != OrderState.Formation)
+            {
+                UserWarning?.Invoke("Состав заказа можно менять только во время формирования заказа");
+                return false;
+            }
+
+            if (!items.TryGetValue(itemArticle, out Item item))
+            {
+                UserWarning?.Invoke("В базе нет товара с данным артикулом");
+                return false;
+            }
+
+            order.SetItemQuantity(item, newQuantity);
+            CheckCustomerDiscounts(id);
+            StateChanged?.Invoke();
+            return true;
+        }
+
+        public bool TryEditAddress(string id, uint orderNumber, string address)
+        {
+            if (!customers.TryGetValue(id, out Customer customer))
+            {
+                UserWarning?.Invoke("Клиент с указанным id не найден в базе");
+                return false;
+            }
+
+            if (!customer.OrderManager.TryGetOrder(orderNumber, out Order order))
+            {
+                UserWarning?.Invoke("Заказ с указанным номером не найден в базе");
+                return false;
+            }
+
+            if (order.state > OrderState.Processing)
+            {
+                UserWarning?.Invoke("Адрес доставки можно менять только до передачи службе доставки");
+                return false;
+            }
+
+            order.Address = address;
+            StateChanged?.Invoke();
+            return true;
+        }
+
+        public bool TryEditDeliveryType(string id, uint orderNumber, DeliveryType newType)
+        {
+            if (!customers.TryGetValue(id, out Customer customer))
+            {
+                UserWarning?.Invoke("Клиент с указанным id не найден в базе");
+                return false;
+            }
+
+            if (!customer.OrderManager.TryGetOrder(orderNumber, out Order order))
+            {
+                UserWarning?.Invoke("Заказ с указанным номером не найден в базе");
+                return false;
+            }
+
+            if (order.state != OrderState.Formation)
+            {
+                UserWarning?.Invoke("Тип доставки можно менять только во время формирования заказа");
+                return false;
+            }
+
+            order.DeliveryType = newType;
+            CheckCustomerDiscounts(id);
+            StateChanged?.Invoke();
+            return true;
+        }
+
+        public bool TryEditCreationDate(string id, uint orderNumber, DateTimeOffset newDate)
+        {
+            if (!customers.TryGetValue(id, out Customer customer))
+            {
+                UserWarning?.Invoke("Клиент с указанным id не найден в базе");
+                return false;
+            }
+
+            if (!customer.OrderManager.TryGetOrder(orderNumber, out Order order))
+            {
+                UserWarning?.Invoke("Заказ с указанным номером не найден в базе");
+                return false;
+            }
+
+            if (order.state != OrderState.Formation)
+            {
+                UserWarning?.Invoke("Дату создания заказа можно менять только на этапе формирования");
+                return false;
+            }
+
+            order.CreationDate = newDate;
+            CheckCustomerDiscounts(id);
+            StateChanged?.Invoke();
+            return true;
+        }
+
+        // Discount
 
         public List<Discount> GetDiscounts()
         {
-            return discounts;
+            return discounts.Values.ToList();
         }
 
-        public Tuple<bool, string> AddDiscount(string customerID, int orderNumber, Discount discount)
+        public bool TryAddDiscount(string id, uint orderNumber, string discountName)
         {
-            if (!customers.TryGetValue(customerID, out Customer customer))
-                throw new Exception("Customer not found in the DB");
+            if (!customers.TryGetValue(id, out Customer customer))
+            {
+                UserWarning?.Invoke("Клиент с указанным id не найден в базе");
+                return false;
+            }
 
             if (!customer.OrderManager.TryGetOrder(orderNumber, out Order order))
-                throw new Exception("Order with the specified number was not found");
-
-            var checkResult = discount.Check(customer, order);
-            if (!checkResult.Item1)
-                return checkResult;
-
-            if (order.discounts.TryGetValue(discount.Family, out Discount discount1))
             {
-                DiscountDenied?.Invoke(order.Number, discount1.Name, checkResult.Item2);
-                order.discounts.Remove(discount.Family);
+                UserWarning?.Invoke("Заказ с указанным номером не найден в базе");
+                return false;
             }
+
+            if (order.state != OrderState.Formation)
+            {
+                UserWarning?.Invoke("Скидки должны быть применены на стадии формирования заказа");
+                return false;
+            }
+
+            if (!discounts.TryGetValue(discountName, out Discount discount))
+            {
+                UserWarning?.Invoke("В базе не найдено скидки с подобным именем");
+                return false;
+            }
+
+            var check = discount.Check(customer, order);
+            if (!check.Item1)
+            {
+                UserWarning?.Invoke(check.Item2);
+                return false;
+            }
+
+            if (order.discounts.ContainsKey(discount.Family))
+                order.discounts.Remove(discount.Family);
             order.discounts.Add(discount.Family, discount);
             StateChanged?.Invoke();
-            return checkResult;
+            return true;
         }
 
+        public bool TryRemoveDiscount(string id, uint orderNumber, string discountName)
+        {
+            if (!customers.TryGetValue(id, out Customer customer))
+            {
+                UserWarning?.Invoke("Клиент с указанным id не найден в базе");
+                return false;
+            }
+
+            if (!customer.OrderManager.TryGetOrder(orderNumber, out Order order))
+            {
+                UserWarning?.Invoke("Заказ с указанным номером не найден в базе");
+                return false;
+            }
+
+            if (order.state != OrderState.Formation)
+            {
+                UserWarning?.Invoke("Скидки должны быть применены на стадии формирования заказа");
+                return false;
+            }
+
+            if (!discounts.TryGetValue(discountName, out Discount discount))
+            {
+                UserWarning?.Invoke("В базе не найдено скидки с подобным именем");
+                return false;
+            }
+
+            if (!order.discounts.Remove(discount.Family))
+            {
+                UserWarning?.Invoke("В заказе не найдено скидки с подобным именем");
+                return false;
+            }
+            StateChanged?.Invoke();
+            return true;
+
+
+        }
     }
 }

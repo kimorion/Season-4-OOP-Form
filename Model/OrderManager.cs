@@ -10,7 +10,7 @@ namespace Program
 {
     public class OrderManager : ICloneable
     {
-        private Dictionary<int, Order> orders = new Dictionary<int, Order>();
+        private Dictionary<uint, Order> orders = new Dictionary<uint, Order>();
 
         public int Count()
         {
@@ -24,18 +24,18 @@ namespace Program
             orders.Add(order.Number, order);
         }
 
-        public void Remove(int number)
+        public void Remove(uint number)
         {
             if (!orders.Remove(number))
                 throw new Exception("There is no order with the given number");
         }
 
-        public bool TryGetOrder(int number, out Order order)
+        public bool TryGetOrder(uint number, out Order order)
         {
             return orders.TryGetValue(number, out order);
         }
 
-        public bool ContainsOrder(int number)
+        public bool ContainsOrder(uint number)
         {
             return orders.ContainsKey(number);
         }
@@ -54,7 +54,7 @@ namespace Program
         {
             return new OrderManager
             {
-                orders = orders.Clone() as Dictionary<int, Order>
+                orders = orders.Clone() as Dictionary<uint, Order>
             };
         }
 

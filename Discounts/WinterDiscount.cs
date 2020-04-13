@@ -11,9 +11,9 @@ namespace Program.Promotion
             Description = "Скидка для заказов, сформированных в период с 25 декабря по 7 января";
         }
 
-        public override Tuple<bool, string> Check(Customer customer, Order order, params string[] exclusiveDiscountFamilies)
+        public override Tuple<bool, string> Check(Customer customer, Order order)
         {
-            var baseCheck = base.Check(customer, order, exclusiveDiscountFamilies);
+            var baseCheck = base.Check(customer, order);
             if (!baseCheck.Item1) return baseCheck;
 
             if (order.CreationDate.Month == 12)

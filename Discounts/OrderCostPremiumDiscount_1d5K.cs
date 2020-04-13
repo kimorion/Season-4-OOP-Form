@@ -15,9 +15,9 @@ namespace Program.Promotion
             return order.TotalCost * 0.15;
         }
 
-        public override Tuple<bool, string> Check(Customer customer, Order order, params string[] exclusiveDiscountFamilies)
+        public override Tuple<bool, string> Check(Customer customer, Order order)
         {
-            var baseCheck = base.Check(customer, order, exclusiveDiscountFamilies);
+            var baseCheck = base.Check(customer, order);
             if (!baseCheck.Item1) return baseCheck;
 
             if (customer.Privilege < Privilege.Premium)

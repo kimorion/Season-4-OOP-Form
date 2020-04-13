@@ -8,6 +8,7 @@ using Program.Promotion;
 namespace Program
 {
     public enum DeliveryType { Standard, Express }
+    public enum OrderState { Formation, Processing, Delivery, Done }
 
     public class Order : ICloneable
     {
@@ -15,9 +16,8 @@ namespace Program
         public Dictionary<string, Discount> discounts = new Dictionary<string, Discount>();
 
         public string Address { get; set; }
-        public DateTimeOffset CreationDate { get; set; } = new DateTimeOffset();
         public DeliveryType DeliveryType { get; set; }
-        public int Number { get; private set; }
+        public uint Number { get; private set; }
         public IEnumerable<OrderLine> OrderLines
         {
             get
@@ -26,6 +26,30 @@ namespace Program
                 {
                     yield return line;
                 }
+            }
+        }
+
+        public OrderState state { get; private set; }
+        public DateTimeOffset CreationDate { get; set; } = new DateTimeOffset();
+        public DateTimeOffset FormationDate { get; private set; }
+        public DateTimeOffset TransferredToDeliveryDate { get; private set; }
+        public DateTimeOffset DeliveredDate { get; private set; }
+
+        public void NextState()
+        {
+            if (state == OrderState.Done) throw new Exception("Достигнуто конечное состояние");
+            state++;
+            if (state == OrderState.Processing)
+            {
+                FormationDate = new DateTimeOffset();
+            }
+            else if (state == OrderState.Delivery)
+            {
+                TransferredToDeliveryDate = new DateTimeOffset();
+            }
+            else
+            {
+                DeliveredDate = new DateTimeOffset();
             }
         }
 
@@ -78,7 +102,7 @@ namespace Program
 
         private Order() { }
 
-        public Order(int number, string address, DeliveryType type)
+        public Order(uint number, string address, DeliveryType type)
         {
             this.Number = number;
             this.CreationDate = DateTimeOffset.Now;
@@ -88,6 +112,8 @@ namespace Program
 
         public void AddOrderLine(OrderLine line)
         {
+            if (state != OrderState.Formation)
+                throw new Exception("Wrong State!");
             OrderLine current;
             if (orderLines.TryGetValue(line, out current))
             {
@@ -102,14 +128,18 @@ namespace Program
             AddOrderLine(line);
         }
 
-        public bool DeleteItem(Item item)
+        public void DeleteItem(Item item)
         {
+            if (state != OrderState.Formation)
+                throw new Exception("Wrong State!");
             OrderLine line = new OrderLine(item, 0);
-            return orderLines.Remove(line);
+            orderLines.Remove(line);
         }
 
         public void SetItemQuantity(Item item, uint quantity)
         {
+            if (state != OrderState.Formation)
+                throw new Exception("Wrong State!");
             OrderLine current;
             if (orderLines.TryGetValue(new OrderLine(item, 0), out current))
             {

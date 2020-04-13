@@ -42,6 +42,8 @@ namespace Program
         DataBase db = new DataBase();
         FileLoader fileLoader = new FileLoader();
         TreeViewGenerator treeGenerator = new TreeViewGenerator();
+        NodeLabelParser parser = new NodeLabelParser();
+
         TreeView customerTree;
         TreeView itemTree;
         TreeView orderTree;
@@ -146,16 +148,23 @@ namespace Program
             {
                 var args = orderTree.TopNode.Tag as OrderArgs;
                 orderTree.Nodes.Clear();
-                LoadCustomerOrders(db.GetCustomer(args.customer.ID));
+                db.TryGetCustomer(args.id, out Customer customer);
+                LoadCustomerOrders(customer);
+
                 orderTree.ExpandAll();
             }
             customerTree.ExpandAll();
         }
 
-        void ShowDiscountWarning(int orderNumber, string discountName, string reason)
+        void ShowDiscountWarning(uint orderNumber, string discountName, string reason)
         {
             MessageBox.Show(string.Format("{0} была удалена из заказа '{1}'.\nПричина: {2}", discountName, orderNumber, reason),
                 "Внимание");
+        }
+
+        void ShowWarning(string message)
+        {
+            MessageBox.Show(message, "Внимание");
         }
 
         void LoadCustomerOrders(Customer customer)
@@ -176,11 +185,10 @@ namespace Program
             MessageBox.Show("База данных была удалена.", "", MessageBoxButtons.OK);
         }
 
-        void CreateOrder(Customer customer)
+        void CreateOrder(string id)
         {
-            Order testOrder = new Order(random.Next(1000000000, 2000000000), "Please, enter address", DeliveryType.Standard);
-            customer.OrderManager.AddOrder(testOrder);
-            db.EditCustomer(customer);
+            Order newOrder = new Order((uint)random.Next(1000000000, 2000000000), "Please, enter address", DeliveryType.Standard);
+            db.TryAddOrder(id, newOrder);
         }
 
         private void tree_BeginDrag(object sender, ItemDragEventArgs e)
@@ -195,10 +203,9 @@ namespace Program
         private void tree_DragOver(object sender, DragEventArgs e)
         {
             TreeView tree = (TreeView)sender;
-
+            TreeNode nodeSource = (TreeNode)e.Data.GetData(typeof(TreeNode));
             e.Effect = DragDropEffects.None;
 
-            TreeNode nodeSource = (TreeNode)e.Data.GetData(typeof(TreeNode));
             if (nodeSource != null)
             {
 
@@ -207,13 +214,13 @@ namespace Program
                 TreeNode nodeTarget = tree.GetNodeAt(pt);
                 if (nodeTarget == null) return;
 
-                if (nodeTarget.Name.Equals("items"))
+                if (nodeTarget.Name.Equals("items") && nodeSource.Name == "item")
                 {
                     e.Effect = DragDropEffects.Copy;
                     tree.SelectedNode = nodeTarget;
                 }
 
-                if (nodeTarget.Name.Equals("discounts"))
+                if (nodeTarget.Name.Equals("discounts") && nodeSource.Name == "discount")
                 {
                     e.Effect = DragDropEffects.Copy;
                     tree.SelectedNode = nodeTarget;
@@ -230,24 +237,17 @@ namespace Program
 
             TreeNode nodeTarget = tree.GetNodeAt(pt);
             TreeNode nodeSource = (TreeNode)e.Data.GetData(typeof(TreeNode));
+            var sourceArgs = nodeSource.Tag as OrderArgs;
+            var targetArgs = nodeTarget.Tag as OrderArgs;
 
             if (nodeSource.Name == "item" && nodeTarget.Name == "items")
             {
                 uint quantity = (uint)Prompt.ShowDialog("Enter quantity", "Enter quantity");
-                var newLine = new OrderLine((nodeSource.Tag as Item).Clone() as Item, quantity);
-
-                var orderArgs = nodeTarget.Tag as OrderArgs;
-                orderArgs.order.AddOrderLine(newLine);
-                if (!db.EditOrder(orderArgs.customer.ID, orderArgs.order))
-                    MessageBox.Show("Клиент не найден в базе данных", "Ошибка");
+                db.TryAddItemToOrder(targetArgs.id, targetArgs.orderNumber, sourceArgs.itemArticle, quantity);
             }
             if (nodeSource.Name == "discount" && nodeTarget.Name == "discounts")
             {
-                var targetArgs = nodeTarget.Tag as OrderArgs;
-                var sourceArgs = nodeSource.Tag as OrderArgs;
-                var result = db.AddDiscount(targetArgs.customer.ID, targetArgs.order.Number, sourceArgs.discount);
-                if (!result.Item1)
-                    ShowDiscountWarning(targetArgs.order.Number, sourceArgs.discount.Name, result.Item2);
+                db.TryAddDiscount(targetArgs.id, targetArgs.orderNumber, sourceArgs.discountName);
             }
         }
 
@@ -256,263 +256,128 @@ namespace Program
         {
             var tree = sender as TreeView;
             var node = e.Node;
-            if (node != null && node.Tag != null)
+            if (node == null || node.Tag == null)
+                return;
+
+            tree.SelectedNode = node;
+
+            switch (node.Name)
             {
-                tree.SelectedNode = node;
-                tree.LabelEdit = true;
-                if (!node.IsEditing)
-                {
-                    node.BeginEdit();
-                }
+                case "address":
+                case "name":
+                case "phone":
+                case "privilege":
+                case "creationDate":
+                case "deliveryType":
+                case "quantity":
+                    {
+                        tree.LabelEdit = true;
+                        if (!node.IsEditing)
+                        {
+                            node.BeginEdit();
+                        }
+                        break;
+                    }
+                default:
+                    return;
             }
-            else
-            {
-                MessageBox.Show("Выбранную запись нельзя редактировать", "Invalid selection");
-            }
+
         }
 
-
-        private void customerTree_AfterLabelEdit(object sender, NodeLabelEditEventArgs e)
+        private void Tree_AfterLabelEdit(object sender, NodeLabelEditEventArgs e)
         {
-            if (e.Label != null)
-            {
-
-                switch (e.Node.Name)
-                {
-                    case "name":
-                        customerTree_AfterNameEdit(sender, e);
-                        break;
-                    case "phone":
-                        customerTree_AfterPhoneEdit(sender, e);
-                        break;
-                    case "privilege":
-                        customerTree_AfterPrivilegeEdit(sender, e);
-                        break;
-
-                    default:
-                        MessageBox.Show("Выбранный пункт нельзя редактировать.\n",
-                           "Редактирование профиля клиента");
-                        e.CancelEdit = true;
-                        e.Node.EndEdit(true);
-                        //UpdateView();
-                        break;
-                }
-
-            }
-        }
-
-        private void customerTree_AfterPhoneEdit(object sender, NodeLabelEditEventArgs e)
-        {
-            if (e.Label.IndexOfAny(new char[] { '@', '.', ',', '!' }) == -1)
-            {
-                // Stop editing without canceling the label change.
-                e.Node.EndEdit(false);
-                var customer = e.Node.Tag as Customer;
-                customer.ContactPhone = e.Label;
-                if (db.EditCustomer(customer))
-                    MessageBox.Show("Телефон успешно изменен.\n", "Операция успешна");
-                else
-                    MessageBox.Show("Клиент не найден в базе данных.\n", "Ошибка");
-            }
-            else
-            {
-                /* Cancel the label edit action, inform the user, and 
-                   place the node in edit mode again. */
-                e.CancelEdit = true;
-                e.Node.EndEdit(true);
-                MessageBox.Show("Неверный формат телефона.\n" +
-                   "Запрещены символы: '@','.', ',', '!'",
-                   "Ошибка");
-            }
-        }
-
-        private void customerTree_AfterPrivilegeEdit(object sender, NodeLabelEditEventArgs e)
-        {
-            Privilege newStatus;
-
-            if (e.Label.IndexOfAny(new char[] { '@', '.', ',', '!' }) == -1
-                && Enum.TryParse(e.Label, out newStatus))
-            {
-                e.Node.EndEdit(false);
-                var customer = e.Node.Tag as Customer;
-                customer.Privilege = newStatus;
-                if (db.EditCustomer(customer))
-                    MessageBox.Show("Статус успешно изменен.\n", "Операция успешна");
-                else
-                    MessageBox.Show("Клиент не найден в базе данных.\n", "Ошибка");
-            }
-            else
-            {
-                /* Cancel the label edit action, inform the user, and 
-                   place the node in edit mode again. */
-                e.CancelEdit = true;
-                e.Node.EndEdit(true);
-                MessageBox.Show("Неверный статус клиента.\n" +
-                   "Возможные статусы: 'Common', 'Premium'",
-                   "Ошибка");
-            }
-        }
-
-        private void customerTree_AfterNameEdit(object sender, NodeLabelEditEventArgs e)
-        {
-            var name = e.Label.Split(' ');
-            if (e.Label.IndexOfAny(new char[] { '@', '.', ',', '!' }) == -1 && name.Length == 3)
-            {
-                // Stop editing without canceling the label change.
-                e.Node.EndEdit(false);
-                var customer = e.Node.Tag as Customer;
-                customer.Name = new FullName(name);
-                if (db.EditCustomer(customer))
-                {
-
-                    MessageBox.Show("ФИО успешно изменено.\n", "Операция успешна");
-
-                }
-                else
-                    MessageBox.Show("Клиент не найден в базе данных.\n", "Ошибка");
-            }
-            else
-            {
-                /* Cancel the label edit action, inform the user, and 
-                   place the node in edit mode again. */
-                e.CancelEdit = true;
-                e.Node.EndEdit(true);
-                MessageBox.Show("Неверный формат ФИО.\n" +
-                   "Запрещены символы: '@','.', ',', '!'",
-                   "Ошибка");
-            }
-        }
-
-
-        private void orderTree_AfterLabelEdit(object sender, NodeLabelEditEventArgs e)
-        {
-            if (e.Label != null)
-            {
-
-                switch (e.Node.Name)
-                {
-                    case "address":
-                        orderTree_AfterAddressEdit(sender, e);
-                        break;
-                    case "date":
-                        orderTree_AfterDateEdit(sender, e);
-                        break;
-                    case "deliveryType":
-                        orderTree_AfterDeliveryTypeEdit(sender, e);
-                        break;
-                    case "quantity":
-                        orderTree_AfterItemQuantityEdit(sender, e);
-                        break;
-
-                    default:
-                        MessageBox.Show("Выбранный пункт нельзя редактировать.\n",
-                           "Редактирование заказов клиента");
-                        e.CancelEdit = true;
-                        e.Node.EndEdit(true);
-                        break;
-                }
-
-            }
-        }
-
-        private void orderTree_AfterAddressEdit(object sender, NodeLabelEditEventArgs e)
-        {
-            if (e.Label.IndexOfAny(new char[] { '@', '!', '?' }) == -1)
-            {
-                // Stop editing without canceling the label change.
-                e.Node.EndEdit(false);
-                var args = e.Node.Tag as OrderArgs;
-                args.order.Address = e.Label;
-
-                if (db.EditOrder(args.customer.ID, args.order))
-                {
-                    MessageBox.Show("Адрес успешно изменен.\n", "Операция успешна");
-                }
-                else
-                    MessageBox.Show("Клиент не найден в базе данных.\n", "Ошибка");
-            }
-            else
+            var node = e.Node;
+            if (e.Label == null)
             {
                 e.CancelEdit = true;
-                e.Node.EndEdit(true);
-                MessageBox.Show("Неверный формат адреса.\n" +
-                   "Запрещены символы: '@', '!', '?'",
-                   "Ошибка");
+                node.EndEdit(true);
+                return;
             }
-        }
 
-        private void orderTree_AfterDateEdit(object sender, NodeLabelEditEventArgs e)
-        {
-            if (e.Label.IndexOfAny(new char[] { '@', '!', '?' }) == -1
-                && DateTimeOffset.TryParse(e.Label, out DateTimeOffset newDate))
+            var args = node.Tag as OrderArgs;
+            switch (node.Name)
             {
-                e.Node.EndEdit(false);
-                var args = e.Node.Tag as OrderArgs;
-                args.order.CreationDate = newDate;
+                case "address":
+                    {
+                        if (parser.TryParseAddress(e.Label, out string result))
+                            if (db.TryEditAddress(args.id, args.orderNumber, result))
+                            {
+                                node.EndEdit(false);
+                                return;
+                            }
+                        ShowWarning("При вводе адреса разрешены только точка и запятая.");
+                        break;
+                    }
+                case "name":
+                    {
+                        if (parser.TryParseName(e.Label, out FullName result))
+                            if (db.TryEditName(args.id, result))
+                            {
+                                node.EndEdit(false);
+                                return;
+                            }
+                        ShowWarning("ФИО должно быть написано через пробел и без лишних знаков");
+                        break;
+                    }
+                case "phone":
+                    {
+                        if (parser.TryParsePhoneNumber(e.Label, out string result))
+                            if (db.TryEditPhoneNumber(args.id, result))
+                            {
+                                node.EndEdit(false);
+                                return;
+                            }
+                        ShowWarning("При вводе телефона используйте только цифры и знак '+'");
+                        break;
+                    }
+                case "privilege":
+                    {
+                        if (Enum.TryParse(e.Label, out Privilege result))
+                            if (db.TryEditPrivilege(args.id, result))
+                            {
+                                node.EndEdit(false);
+                                return;
+                            }
+                        ShowWarning("На данный момент доступны только Common и Premium привилегии");
+                        break;
+                    }
+                case "creationDate":
+                    {
+                        if (DateTimeOffset.TryParse(e.Label, out DateTimeOffset newDate))
+                            if (db.TryEditCreationDate(args.id, args.orderNumber, newDate))
+                            {
+                                node.EndEdit(false);
+                                return;
+                            }
+                        ShowWarning("Введите дату в формате dd.MM.yyyy");
+                        break;
+                    }
+                case "deliveryType":
+                    {
+                        if (Enum.TryParse(e.Label, out DeliveryType result))
+                            if (db.TryEditDeliveryType(args.id, args.orderNumber, result))
+                            {
+                                node.EndEdit(false);
+                                return;
+                            }
+                        ShowWarning("На данный момент доступна только Standard и Express доставка");
+                        break;
+                    }
+                case "quantity":
+                    {
+                        if (uint.TryParse(e.Label, out uint result))
+                            if (db.TryEditItemQuantity(args.id, args.orderNumber, args.itemArticle, result))
+                            {
+                                node.EndEdit(false);
+                                return;
+                            }
+                        break;
+                    }
 
-                if (db.EditOrder(args.customer.ID, args.order))
-                {
-                    MessageBox.Show("Дата формирования заказа успешно изменена.\n", "Операция успешна");
-                }
-                else
-                    MessageBox.Show("Клиент не найден в базе данных.\n", "Ошибка");
             }
-            else
-            {
-                e.CancelEdit = true;
-                e.Node.EndEdit(true);
-                MessageBox.Show("Неверный формат даты.\n" +
-                   "Требуемый формат: \"dd.mm.yyyy\"",
-                   "Ошибка");
-            }
-        }
+            e.CancelEdit = true;
+            e.Node.EndEdit(true);
 
-        private void orderTree_AfterDeliveryTypeEdit(object sender, NodeLabelEditEventArgs e)
-        {
-            if (e.Label.IndexOfAny(new char[] { '@', '.', ',', '!' }) == -1
-                && Enum.TryParse(e.Label, out DeliveryType newType))
-            {
-                e.Node.EndEdit(false);
-                var args = e.Node.Tag as OrderArgs;
-                args.order.DeliveryType = newType;
-                if (db.EditOrder(args.customer.ID, args.order))
-                    MessageBox.Show("Статус успешно изменен.\n", "Операция успешна");
-                else
-                    MessageBox.Show("Клиент не найден в базе данных.\n", "Ошибка");
-            }
-            else
-            {
-                /* Cancel the label edit action, inform the user, and 
-                   place the node in edit mode again. */
-                e.CancelEdit = true;
-                e.Node.EndEdit(true);
-                MessageBox.Show("Неверный статус доставки.\n" +
-                   "Возможные статусы: 'Standard', 'Express'",
-                   "Ошибка");
-            }
-        }
-
-        private void orderTree_AfterItemQuantityEdit(object sender, NodeLabelEditEventArgs e)
-        {
-            if (e.Label.IndexOfAny(new char[] { '@', '.', ',', '!' }) == -1
-                && uint.TryParse(e.Label, out uint newAmount))
-            {
-                e.Node.EndEdit(false);
-                var args = e.Node.Tag as OrderArgs;
-                args.order.SetItemQuantity(args.orderLine.Item, newAmount);
-                if (db.EditOrder(args.customer.ID, args.order))
-                    MessageBox.Show("Количество успешно изменено.\n", "Операция успешна");
-                else
-                    MessageBox.Show("Клиент не найден в базе данных.\n", "Ошибка");
-            }
-            else
-            {
-                /* Cancel the label edit action, inform the user, and 
-                   place the node in edit mode again. */
-                e.CancelEdit = true;
-                e.Node.EndEdit(true);
-                MessageBox.Show("Вы ввели не целое число.\n", "Ошибка");
-            }
         }
 
 
@@ -580,8 +445,7 @@ namespace Program
                     if (orderTree.SelectedNode.Name == "number")
                     {
                         var orderArgs = orderTree.SelectedNode.Tag as OrderArgs;
-                        orderArgs.customer.OrderManager.Remove(orderArgs.order.Number);
-                        db.EditOrder(orderArgs.customer.ID, orderArgs.order);
+                        db.TryDeleteOrder(orderArgs.id, orderArgs.orderNumber);
                     }
             };
             orderContextMenu.MenuItems.Add(deleteOrderItem);
@@ -594,8 +458,7 @@ namespace Program
                     if (orderTree.SelectedNode.Name == "item")
                     {
                         var orderArgs = orderTree.SelectedNode.Tag as OrderArgs;
-                        orderArgs.order.DeleteItem(orderArgs.orderLine.Item);
-                        db.EditOrder(orderArgs.customer.ID, orderArgs.order);
+                        db.TryDeleteItemFromOrder(orderArgs.id, orderArgs.orderNumber, orderArgs.itemArticle);
                     }
             };
             orderLineContextMenu.MenuItems.Add(deleteOrderLineItem);
@@ -607,8 +470,8 @@ namespace Program
                 if (itemTree.SelectedNode != null)
                     if (itemTree.SelectedNode.Name == "item")
                     {
-                        var item = itemTree.SelectedNode.Tag as Item;
-                        db.DeleteItem(item);
+                        var orderArgs = itemTree.SelectedNode.Tag as OrderArgs;
+                        throw new NotImplementedException();
                     }
             };
             itemContextMenu.MenuItems.Add(deleteItemItem);
@@ -620,8 +483,9 @@ namespace Program
                 if (customerTree.SelectedNode != null)
                     if (customerTree.SelectedNode.Name == "name")
                     {
-                        var customer = customerTree.SelectedNode.Tag as Customer;
-                        LoadCustomerOrders(db.GetCustomer(customer.ID));
+                        var orderArgs = customerTree.SelectedNode.Tag as OrderArgs;
+                        db.TryGetCustomer(orderArgs.id, out Customer customer);
+                        LoadCustomerOrders(customer);
                     }
             };
             userContextMenu.MenuItems.Add(editOrdersItem);
@@ -634,8 +498,7 @@ namespace Program
                     if (orderTree.SelectedNode.Name == "discount")
                     {
                         var orderArgs = orderTree.SelectedNode.Tag as OrderArgs;
-                        orderArgs.order.discounts.Remove(orderArgs.discount.Family);
-                        db.EditOrder(orderArgs.customer.ID, orderArgs.order);
+                        db.TryRemoveDiscount(orderArgs.id, orderArgs.orderNumber, orderArgs.discountName);
                     }
             };
             discountContextMenu.MenuItems.Add(deleteDiscountItem);
@@ -689,8 +552,7 @@ namespace Program
                 if (orderTree.Nodes.Count != 0)
                 {
                     var orderArgs = orderTree.Nodes[0].Tag as OrderArgs;
-                    CreateOrder(orderArgs.customer);
-                    LoadCustomerOrders(db.GetCustomer(orderArgs.customer.ID));
+                    CreateOrder(orderArgs.id);
                 }
                 else MessageBox.Show(
                     "Сначала выберите клиента в левой части окна,\nщелкнув по нему правой кнопкой мыши и выбрав\n\"Редактировать заказы\"",
@@ -728,7 +590,7 @@ namespace Program
             };
 
             customerTree.NodeMouseDoubleClick += (sender, args) => tree_AfterDoubleClick(sender, args);
-            customerTree.AfterLabelEdit += (sender, args) => customerTree_AfterLabelEdit(sender, args);
+            customerTree.AfterLabelEdit += (sender, args) => Tree_AfterLabelEdit(sender, args);
             customerTree.NodeMouseClick += (sender, args) => customerTree.SelectedNode = args.Node;
 
             itemTree.ItemDrag += (sender, args) => tree_BeginDrag(sender, args);
@@ -742,7 +604,7 @@ namespace Program
             orderTree.DragDrop += (sender, args) => orderTree_EndItemDrag(sender, args);
             orderTree.NodeMouseClick += (sender, args) => orderTree.SelectedNode = args.Node;
             orderTree.NodeMouseDoubleClick += (sender, args) => tree_AfterDoubleClick(sender, args);
-            orderTree.AfterLabelEdit += (sender, args) => orderTree_AfterLabelEdit(sender, args);
+            orderTree.AfterLabelEdit += (sender, args) => Tree_AfterLabelEdit(sender, args);
 
             discountTree.ItemDrag += (sender, args) => tree_BeginDrag(sender, args);
             discountTree.NodeMouseClick += (sender, args) => discountTree.SelectedNode = args.Node;
@@ -818,6 +680,7 @@ namespace Program
 
             db.StateChanged += UpdateView;
             db.DiscountDenied += ShowDiscountWarning;
+            db.UserWarning += ShowWarning;
         }
 
 
