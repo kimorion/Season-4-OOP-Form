@@ -163,6 +163,12 @@ namespace Program
 
             orderRoot.Nodes.Add(new TreeNode()
             {
+                Name = "state",
+                Text = "Текущее состояние: "+order.state.ToString(),
+                ToolTipText = "Состояние заказа"
+            });
+            orderRoot.Nodes.Add(new TreeNode()
+            {
                 Name = "address",
                 Text = order.Address,
                 ToolTipText = "Адрес заказчика",

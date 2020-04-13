@@ -409,6 +409,30 @@ namespace Program
             return true;
         }
 
+        public bool TryPushNextState(string id, uint orderNumber)
+        {
+            if (!customers.TryGetValue(id, out Customer customer))
+            {
+                UserWarning?.Invoke("Клиент с указанным id не найден в базе");
+                return false;
+            }
+
+            if (!customer.OrderManager.TryGetOrder(orderNumber, out Order order))
+            {
+                UserWarning?.Invoke("Заказ с указанным номером не найден в базе");
+                return false;
+            }
+
+            if (order.state == OrderState.Done)
+            {
+                UserWarning?.Invoke("Заказ уже находится в завершенном состоянии");
+                return false;
+            }
+            order.NextState();
+            StateChanged?.Invoke();
+            return true;
+        }
+
         // Discount
 
         public List<Discount> GetDiscounts()

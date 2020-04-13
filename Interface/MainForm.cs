@@ -439,6 +439,16 @@ namespace Program
         {
             orderContextMenu = new ContextMenu();
             var deleteOrderItem = new MenuItem("Удалить заказ");
+            var nextStateItem = new MenuItem("Следующее состояние заказа");
+            nextStateItem.Click += (sender, args) =>
+            {
+                if (orderTree.SelectedNode != null)
+                    if (orderTree.SelectedNode.Name == "number")
+                    {
+                        var orderArgs = orderTree.SelectedNode.Tag as OrderArgs;
+                        db.TryPushNextState(orderArgs.id, orderArgs.orderNumber);
+                    }
+            };
             deleteOrderItem.Click += (sender, args) =>
             {
                 if (orderTree.SelectedNode != null)
@@ -449,6 +459,7 @@ namespace Program
                     }
             };
             orderContextMenu.MenuItems.Add(deleteOrderItem);
+            orderContextMenu.MenuItems.Add(nextStateItem);
 
             orderLineContextMenu = new ContextMenu();
             var deleteOrderLineItem = new MenuItem("Удалить товар из заказа");

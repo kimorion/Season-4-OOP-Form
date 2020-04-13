@@ -157,7 +157,8 @@ namespace Program
                 DeliveryType = DeliveryType,
                 CreationDate = CreationDate,
                 orderLines = orderLines.Clone() as HashSet<OrderLine>,
-                discounts = discounts.Clone() as Dictionary<string, Discount>
+                discounts = discounts.Clone() as Dictionary<string, Discount>,
+                state = state
             };
         }
     }
