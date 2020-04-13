@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Program.Model;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -15,6 +16,8 @@ namespace Program
         public string ContactPhone { get; set; }
         public Privilege Privilege { get; set; }
         public OrderManager OrderManager { get; private set; } = new OrderManager();
+
+        public List<Discount> discounts = new List<Discount>();
 
         public Customer(string code, FullName fullName, string contactPhone, Privilege privilege)
         {

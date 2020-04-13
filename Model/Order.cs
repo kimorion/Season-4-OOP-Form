@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Program.Model;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -10,13 +11,13 @@ namespace Program
 
     public class Order : ICloneable
     {
-        private HashSet<OrderLine> orderLines;
+        private HashSet<OrderLine> orderLines = new HashSet<OrderLine>();
+        public Dictionary<string, Discount> discounts = new Dictionary<string, Discount>();
 
         public string Address { get; set; }
         public DateTimeOffset CreationDate { get; private set; } = new DateTimeOffset();
         public DeliveryType DeliveryType { get; set; }
         public int Number { get; private set; }
-
         public IEnumerable<OrderLine> OrderLines
         {
             get
@@ -71,7 +72,6 @@ namespace Program
             this.CreationDate = DateTimeOffset.Now;
             this.Address = address;
             this.DeliveryType = type;
-            this.orderLines = new HashSet<OrderLine>();
         }
 
         public void AddOrderLine(OrderLine line)

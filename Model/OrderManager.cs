@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Program.Model;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -67,6 +68,14 @@ namespace Program
             }
         }
 
+        public double GetOrderCost(int number)
+        {
+            throw new NotImplementedException();
+        }
 
+        public double GetOrderCost(int number, List<Discount> discounts)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

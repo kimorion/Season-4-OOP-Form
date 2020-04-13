@@ -52,10 +52,16 @@
     <Compile Include="BufferedTreeView.cs">
       <SubType>Component</SubType>
     </Compile>
+    <Compile Include="Discounts\OrderCostDiscount_1d5K.cs" />
+    <Compile Include="Discounts\OrderCostDiscount_1K.cs" />
+    <Compile Include="Discounts\OrderCostPremiumDiscount_1d5K.cs" />
+    <Compile Include="Discounts\PremiumCustomerDiscount.cs" />
+    <Compile Include="Discounts\WinterDiscount.cs" />
     <Compile Include="Model\Customer.cs" />
     <Compile Include="DataBase.cs" />
     <Compile Include="Extensions.cs" />
     <Compile Include="FileLoader.cs" />
+    <Compile Include="Discounts\Discount.cs" />
     <Compile Include="Model\FullName.cs" />
     <Compile Include="Model\Item.cs" />
     <Compile Include="Model\Order.cs" />

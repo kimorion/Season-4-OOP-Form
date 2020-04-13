@@ -590,6 +590,7 @@ namespace Program
 
         public MainForm()
         {
+            var obj = new object();
             CreateMenu();
             CreateContextMenu();
             CreateWindowControls();
