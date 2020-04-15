@@ -58,7 +58,7 @@
     <Compile Include="Discounts\PremiumCustomerDiscount.cs" />
     <Compile Include="Discounts\WinterDiscount.cs" />
     <Compile Include="Model\Customer.cs" />
-    <Compile Include="DataBase.cs" />
+    <Compile Include="Model\Database.cs" />
     <Compile Include="Extensions.cs" />
     <Compile Include="FileLoader.cs" />
     <Compile Include="Discounts\Discount.cs" />

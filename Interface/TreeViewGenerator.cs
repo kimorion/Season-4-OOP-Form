@@ -270,6 +270,7 @@ namespace Program
         public void GenerateOrderTree(TreeView ordersTree, Customer customer,
             ContextMenu orderMenu, ContextMenu orderLineMenu, ContextMenu discountContextMenu)
         {
+            if (customer == null) return;
             ordersTree.BeginUpdate();
             ordersTree.Nodes.Clear();
 

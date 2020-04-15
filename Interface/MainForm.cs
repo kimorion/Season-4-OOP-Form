@@ -33,7 +33,7 @@ namespace Program
     class MainForm : Form
     {
         Random random = new Random();
-        DataBase db = new DataBase();
+        Database db = new Database();
         FileLoader fileLoader = new FileLoader();
         TreeViewGenerator treeGenerator = new TreeViewGenerator();
         NodeLabelParser parser = new NodeLabelParser();
@@ -73,6 +73,7 @@ namespace Program
 
         void LoadCustomersFromFile()
         {
+            if (!db.IsAvailable) { ShowWarning("База данных не инициализирована"); return; }
             using (OpenFileDialog openFileDialog = new OpenFileDialog())
             {
                 openFileDialog.InitialDirectory = @"C:\Users\Elizabethh\YandexDisk\Documents\Bauman\Programming\Season4\hw1";
@@ -93,6 +94,7 @@ namespace Program
 
         void LoadCustomersFromFile(string fileName)
         {
+            if (!db.IsAvailable) { ShowWarning("База данных не инициализирована"); return; }
             var customers = fileLoader.LoadCustomersFromFile(fileName);
             foreach (var customer in customers)
             {
@@ -102,6 +104,7 @@ namespace Program
 
         void LoadItemsFromFile()
         {
+            if (!db.IsAvailable) { ShowWarning("База данных не инициализирована"); return; }
             using (OpenFileDialog openFileDialog = new OpenFileDialog())
             {
                 openFileDialog.InitialDirectory = @"C:\Users\Elizabethh\YandexDisk\Documents\Bauman\Programming\Season4\hw1";
@@ -123,6 +126,7 @@ namespace Program
 
         void LoadItemsFromFile(string fileName)
         {
+            if (!db.IsAvailable) { ShowWarning("База данных не инициализирована"); return; }
             var items = fileLoader.LoadItemsFromFile(fileName);
             foreach (var item in items)
             {
@@ -132,15 +136,7 @@ namespace Program
 
         void UpdateView()
         {
-            if (!db.IsAvailable)
-            {
-                MessageBox.Show(
-                    "База данных не доступна (или не создана)",
-                    "Ошибка",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
-                return;
-            }
+            if (!db.IsAvailable) { ShowWarning("База данных не инициализирована"); return; }
 
             treeGenerator.GenerateItemTree(itemTree, db.GetItems(), itemContextMenu);
             treeGenerator.GenerateCustomerTree(customerTree, db.GetCustomers(), userContextMenu);
@@ -177,6 +173,8 @@ namespace Program
 
         void ResetDB()
         {
+            if (!db.IsAvailable) { ShowWarning("База данных уже удалена"); return; }
+
             db.Reset();
             MessageBox.Show("База данных была удалена.", "", MessageBoxButtons.OK);
         }
@@ -408,7 +406,14 @@ namespace Program
             initializeDBItem.Click += (sender, args) => InitializeDB(true);
             loadItemsMenuItem.Click += (sender, args) => { LoadItemsFromFile(); UpdateView(); };
             updateViewItem.Click += (sender, args) => UpdateView();
-            resetDBItem.Click += (sender, args) => ResetDB();
+            resetDBItem.Click += (sender, args) =>
+            {
+                ResetDB();
+                customerTree.Nodes.Clear();
+                itemTree.Nodes.Clear();
+                orderTree.Nodes.Clear();
+                discountTree.Nodes.Clear();
+            };
             exitProgramItem.Click += (sender, args) => Application.Exit();
 
             var mainMenu = new MainMenu(new[] {

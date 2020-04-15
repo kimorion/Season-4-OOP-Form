@@ -40,16 +40,6 @@ namespace Program
             return orders.ContainsKey(number);
         }
 
-        public bool EditOrder(Order order)
-        {
-            if (!orders.ContainsKey(order.Number))
-            {
-                throw new Exception("There is no order with the given number");
-            }
-            orders[order.Number] = order;
-            return true;
-        }
-
         public object Clone()
         {
             return new OrderManager
@@ -67,16 +57,6 @@ namespace Program
                     yield return item.Value;
                 }
             }
-        }
-
-        public double GetOrderCost(int number)
-        {
-            throw new NotImplementedException();
-        }
-
-        public double GetOrderCost(int number, List<Discount> discounts)
-        {
-            throw new NotImplementedException();
         }
     }
 }

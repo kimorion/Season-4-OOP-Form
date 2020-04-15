@@ -10,7 +10,7 @@ namespace Program
 {
     public delegate void DiscountEventHandler(uint orderNumber, string discountName, string reason);
 
-    class DataBase
+    class Database
     {
         public event Action StateChanged;
         public event DiscountEventHandler DiscountDenied;
@@ -47,6 +47,7 @@ namespace Program
         {
             customers = null;
             items = null;
+            discounts = null;
         }
 
         public void CheckCustomerDiscounts(string id)
@@ -146,13 +147,22 @@ namespace Program
             if (customer == null)
                 throw new Exception("Attempt to add null customer to the DB");
             if (customers == null)
-                throw new Exception("Attempt to add customer to the unitialized DB");
+            {
+                UserWarning("База данных не инициализирована");
+                return;
+            }
             customers.Add(customer.ID, customer);
             StateChanged?.Invoke();
         }
 
         public bool TryGetCustomer(string id, out Customer customer)
         {
+            customer = null;
+            if (customers == null)
+            {
+                UserWarning("База данных не инициализирована");
+                return false;
+            }
             var result = customers.TryGetValue(id, out Customer original);
             customer = original?.Clone() as Customer;
             return result;
@@ -167,6 +177,11 @@ namespace Program
         {
             get
             {
+                if (customers == null)
+                {
+                    UserWarning("База данных не инициализирована");
+                    yield break;
+                }
                 foreach (var customer in customers)
                 {
                     yield return customer.Value.Clone() as Customer;
@@ -182,34 +197,34 @@ namespace Program
             if (item == null)
                 throw new Exception("Attempt to add null item to the DB");
             if (items == null)
-                throw new Exception("Attempt to add item to the unitialized DB");
-
+            {
+                UserWarning("База данных не инициализирована");
+                return;
+            }
             items.Add(item.Article, item);
             StateChanged?.Invoke();
         }
 
         public Item GetItem(string article)
         {
+            if (items == null)
+            {
+                UserWarning("База данных не инициализирована");
+                return null;
+            }
             items.TryGetValue(article, out Item item);
             return item?.Clone() as Item;
-        }
-
-        public bool EditItem(Item item)
-        {
-            if (!items.TryGetValue(item.Article, out Item result))
-            {
-                return false;
-            }
-
-            items[item.Article] = item.Clone() as Item;
-            StateChanged?.Invoke();
-            return true;
         }
 
         public IEnumerable<Item> Items
         {
             get
             {
+                if (items == null)
+                {
+                    UserWarning("База данных не инициализирована");
+                    yield break;
+                }
                 foreach (var item in items)
                 {
                     yield return item.Value.Clone() as Item;
@@ -219,6 +234,11 @@ namespace Program
 
         public List<Item> GetItems()
         {
+            if (items == null)
+            {
+                UserWarning("База данных не инициализирована");
+                return null;
+            }
             return items.Values.ToList().Clone() as List<Item>;
         }
 
