@@ -428,6 +428,12 @@ namespace Program
                 UserWarning?.Invoke("Заказ уже находится в завершенном состоянии");
                 return false;
             }
+
+            if (order.OrderLinesAmount == 0)
+            {
+                UserWarning?.Invoke("Заказ не должен быть пустым");
+                return false;
+            }
             order.NextState();
             StateChanged?.Invoke();
             return true;
@@ -473,8 +479,11 @@ namespace Program
                 return false;
             }
 
-            if (order.discounts.ContainsKey(discount.Family))
+            if (order.discounts.TryGetValue(discount.Family, out Discount discountToRemove))
+            {
+                DiscountDenied(orderNumber, discountToRemove.Name, string.Format("Скидка замещена другой скидкой ({0})", discount.Name));
                 order.discounts.Remove(discount.Family);
+            }
             order.discounts.Add(discount.Family, discount);
             StateChanged?.Invoke();
             return true;

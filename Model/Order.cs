@@ -38,18 +38,19 @@ namespace Program
         public void NextState()
         {
             if (state == OrderState.Done) throw new Exception("Достигнуто конечное состояние");
+            if (orderLines.Count == 0) throw new Exception("Заказ не может быть пустым");
             state++;
             if (state == OrderState.Processing)
             {
-                FormationDate = new DateTimeOffset();
+                FormationDate = DateTimeOffset.Now;
             }
             else if (state == OrderState.Delivery)
             {
-                TransferredToDeliveryDate = new DateTimeOffset();
+                TransferredToDeliveryDate = DateTimeOffset.Now;
             }
             else
             {
-                DeliveredDate = new DateTimeOffset();
+                DeliveredDate = DateTimeOffset.Now; 
             }
         }
 
@@ -156,6 +157,9 @@ namespace Program
                 Number = Number,
                 DeliveryType = DeliveryType,
                 CreationDate = CreationDate,
+                FormationDate = FormationDate,
+                TransferredToDeliveryDate = TransferredToDeliveryDate,
+                DeliveredDate = DeliveredDate,
                 orderLines = orderLines.Clone() as HashSet<OrderLine>,
                 discounts = discounts.Clone() as Dictionary<string, Discount>,
                 state = state

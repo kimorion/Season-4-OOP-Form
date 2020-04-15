@@ -1,12 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Threading;
-using Program.Promotion;
 
 namespace Program
 {
@@ -63,6 +57,19 @@ namespace Program
         TableLayoutPanel orderHeaderTable;
         TableLayoutPanel mainTable;
         TableLayoutPanel middleTable;
+
+
+        void ShowDiscountWarning(uint orderNumber, string discountName, string reason)
+        {
+            MessageBox.Show(string.Format("{0} была удалена из заказа '{1}'.\nПричина: {2}", discountName, orderNumber, reason),
+                "Внимание");
+        }
+
+        void ShowWarning(string message)
+        {
+            MessageBox.Show(message, "Внимание");
+        }
+
 
         void LoadCustomersFromFile()
         {
@@ -154,17 +161,6 @@ namespace Program
                 orderTree.ExpandAll();
             }
             customerTree.ExpandAll();
-        }
-
-        void ShowDiscountWarning(uint orderNumber, string discountName, string reason)
-        {
-            MessageBox.Show(string.Format("{0} была удалена из заказа '{1}'.\nПричина: {2}", discountName, orderNumber, reason),
-                "Внимание");
-        }
-
-        void ShowWarning(string message)
-        {
-            MessageBox.Show(message, "Внимание");
         }
 
         void LoadCustomerOrders(Customer customer)

@@ -49,7 +49,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BufferedTreeView.cs">
+    <Compile Include="Interface\BufferedTreeView.cs">
       <SubType>Component</SubType>
     </Compile>
     <Compile Include="Discounts\OrderCostDiscount_1d5K.cs" />
@@ -67,7 +67,7 @@
     <Compile Include="Model\Order.cs" />
     <Compile Include="Model\OrderLine.cs" />
     <Compile Include="Model\OrderManager.cs" />
-    <Compile Include="NodeLabelParser.cs" />
+    <Compile Include="Interface\NodeLabelParser.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Interface\TESTFORM.cs">

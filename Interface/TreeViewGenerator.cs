@@ -97,10 +97,10 @@ namespace Program
             itemsTree.Nodes.Clear();
             foreach (var item in items)
             {
-                var itemRoot = new TreeNode(item.Article);
+                var itemRoot = new TreeNode(item.Name);
                 itemRoot.ContextMenu = itemMenu;
                 itemRoot.Name = "item";
-                itemRoot.Nodes.Add("Name: " + item.Name);
+                itemRoot.Nodes.Add("Article: " + item.Article);
                 itemRoot.Nodes.Add("Price: " + item.UnitPrice.ToString("0.00"));
                 itemRoot.Tag = new OrderArgs(item);
                 itemsTree.Nodes.Add(itemRoot);
@@ -177,10 +177,43 @@ namespace Program
             orderRoot.Nodes.Add(new TreeNode()
             {
                 Name = "creationDate",
-                Text = order.CreationDate.ToString("dd.MM.yyyy"),
-                ToolTipText = "Дата оформления заказа",
+                Text = "Создан: "+order.CreationDate.ToString("dd.MM.yyyy"),
+                ToolTipText = "Дата создания заказа",
                 Tag = new OrderArgs(customer, order)
             });
+
+            if(order.state >= OrderState.Processing)
+            {
+                orderRoot.Nodes.Add(new TreeNode()
+                {
+                    Name = "formationDate",
+                    Text = "Подтвержден: " + order.FormationDate.ToString("dd.MM.yyyy"),
+                    ToolTipText = "Дата подтверждения заказа",
+                    Tag = new OrderArgs(customer, order)
+                });
+            }
+            if (order.state >= OrderState.Delivery)
+            {
+                orderRoot.Nodes.Add(new TreeNode()
+                {
+                    Name = "transferToDeliveryDate",
+                    Text = "Передан в службу доставки: " + order.TransferredToDeliveryDate.ToString("dd.MM.yyyy"),
+                    ToolTipText = "Дата передачи товара службе доставки",
+                    Tag = new OrderArgs(customer, order)
+                });
+            }
+            if (order.state >= OrderState.Done)
+            {
+                orderRoot.Nodes.Add(new TreeNode()
+                {
+                    Name = "deliveredDate",
+                    Text = "Доставлен: " + order.DeliveredDate.ToString("dd.MM.yyyy"),
+                    ToolTipText = "Дата передачи товара клиенту",
+                    Tag = new OrderArgs(customer, order),
+                    NodeFont = new System.Drawing.Font("Arial", 10, System.Drawing.FontStyle.Bold)
+                });
+            }
+
             orderRoot.Nodes.Add(new TreeNode()
             {
                 Name = "deliveryType",
