@@ -11,11 +11,12 @@ namespace Program
     public class FileLoader
     {
 
-        public List<Customer> LoadCustomersFromFile(string fileName)
+        public List<Customer> LoadCustomersFromFile(string fileName, Action<string> informUser)
         {
             using (var fileStream = File.OpenRead(fileName))
             using (var streamReader = new StreamReader(fileStream))
             {
+                StringBuilder builder = new StringBuilder();
                 string line;
                 int lineNumber = 0;
                 List<Customer> result = new List<Customer>();
@@ -27,14 +28,14 @@ namespace Program
                     var info = line.Split('|');
                     if (info.Length != 4)
                     {
-                        Console.WriteLine("Customers file corrupted in the line: " + lineNumber);
+                        builder.AppendLine("Customers file corrupted in the line: " + lineNumber);
                         continue;
                     }
 
                     var splittedName = info[2].Split(' ');
                     if (splittedName.Length < 3)
                     {
-                        Console.WriteLine(
+                        builder.AppendLine(
                             "Customers file corrupted in the line (invalid Full Name format): "
                             + lineNumber);
                         continue;
@@ -50,16 +51,19 @@ namespace Program
                 }
 
                 if (lineNumber == 0)
-                    throw new Exception("Customers file was empty");
+                    builder.AppendLine("Customers file was empty");
+                if (builder.Length != 0)
+                    informUser(builder.ToString());
                 return result;
             }
         }
 
-        public List<Item> LoadItemsFromFile(string fileName)
+        public List<Item> LoadItemsFromFile(string fileName, Action<string> informUser)
         {
             using (var fileStream = File.OpenRead(fileName))
             using (var streamReader = new StreamReader(fileStream))
             {
+                StringBuilder builder = new StringBuilder();
                 string line;
                 int lineNumber = 0;
                 List<Item> result = new List<Item>();
@@ -71,19 +75,23 @@ namespace Program
                     var info = line.Split('|');
                     if (info.Length != 3)
                     {
-                        Console.WriteLine("Items file corrupted in the line: " + lineNumber);
+                        builder.AppendLine("Items file corrupted in the line: " + lineNumber);
                         continue;
                     }
 
                     double price;
                     if (!double.TryParse(info[2], out price))
                     {
-                        Console.WriteLine("Items file corrupted in the line (wrong price format): " + lineNumber);
+                        builder.AppendLine("Items file corrupted in the line (wrong price format): " + lineNumber);
                         continue;
                     }
 
                     result.Add(new Item(info[0], info[1], price));
                 }
+                if (result.Count == 0)
+                    builder.AppendLine("File was empty!");
+                if (builder.Length != 0)
+                    informUser(builder.ToString());
                 return result;
             }
         }

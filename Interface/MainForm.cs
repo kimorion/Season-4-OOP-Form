@@ -67,7 +67,7 @@ namespace Program
 
         void ShowWarning(string message)
         {
-            MessageBox.Show(message, "Внимание");
+            MessageBox.Show(message, "Внимание", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
 
 
@@ -81,7 +81,7 @@ namespace Program
 
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
-                    var customers = fileLoader.LoadCustomersFromFile(openFileDialog.FileName);
+                    var customers = fileLoader.LoadCustomersFromFile(openFileDialog.FileName, ShowWarning);
                     foreach (var customer in customers)
                     {
                         db.AddCustomer(customer);
@@ -95,7 +95,7 @@ namespace Program
         void LoadCustomersFromFile(string fileName)
         {
             if (!db.IsAvailable) { ShowWarning("База данных не инициализирована"); return; }
-            var customers = fileLoader.LoadCustomersFromFile(fileName);
+            var customers = fileLoader.LoadCustomersFromFile(fileName, ShowWarning);
             foreach (var customer in customers)
             {
                 db.AddCustomer(customer);
@@ -112,7 +112,7 @@ namespace Program
 
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
-                    var items = fileLoader.LoadItemsFromFile(openFileDialog.FileName);
+                    var items = fileLoader.LoadItemsFromFile(openFileDialog.FileName, ShowWarning);
                     foreach (var item in items)
                     {
                         db.AddItem(item);
@@ -127,7 +127,7 @@ namespace Program
         void LoadItemsFromFile(string fileName)
         {
             if (!db.IsAvailable) { ShowWarning("База данных не инициализирована"); return; }
-            var items = fileLoader.LoadItemsFromFile(fileName);
+            var items = fileLoader.LoadItemsFromFile(fileName, ShowWarning);
             foreach (var item in items)
             {
                 db.AddItem(item);
