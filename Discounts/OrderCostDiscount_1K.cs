@@ -18,13 +18,11 @@ namespace Program.Promotion
 
         public override Tuple<bool, string> Check(Customer customer, Order order)
         {
-            var baseCheck = base.Check(customer, order);
-            if (!baseCheck.Item1) return baseCheck;
-
             if (order.TotalCost < 1000)
                 return Refusal("Заказ дешевле 1000 рублей");
+            var baseCheck = base.Check(customer, order);
+            if (!baseCheck.Item1) return baseCheck;
             return Permit();
-
         }
 
 

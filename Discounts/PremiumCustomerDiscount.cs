@@ -18,11 +18,10 @@ namespace Program.Promotion
 
         public override Tuple<bool, string> Check(Customer customer, Order order)
         {
-            var baseCheck = base.Check(customer, order);
-            if (!baseCheck.Item1) return baseCheck;
-
             if (customer.Privilege < Privilege.Premium)
                 return Refusal("Скидка только для клиентов со статусом Premium");
+            var baseCheck = base.Check(customer, order);
+            if (!baseCheck.Item1) return baseCheck;
             return Permit();
         }
 

@@ -13,16 +13,18 @@ namespace Program.Promotion
 
         public override Tuple<bool, string> Check(Customer customer, Order order)
         {
+            bool result = false;
+            if (order.CreationDate.Month == 12 && order.CreationDate.Day >= 25)
+                result = true;
+            if (order.CreationDate.Month == 1 && order.CreationDate.Day <= 7)
+                result = true;
+
             var baseCheck = base.Check(customer, order);
             if (!baseCheck.Item1) return baseCheck;
 
-            if (order.CreationDate.Month == 12)
-                if (order.CreationDate.Day >= 25)
-                    return Permit();
-            if (order.CreationDate.Month == 1)
-                if (order.CreationDate.Day <= 7)
-                    return Permit();
-            return Refusal("Дата формирования заказа не удовлетворяет сроку действия акции");
+            if (result)
+                return Permit();
+            else return Refusal("Дата формирования заказа не удовлетворяет сроку действия акции");
 
         }
 
