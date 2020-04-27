@@ -8,7 +8,7 @@ using Program.Promotion;
 namespace Program
 {
     public enum DeliveryType { Standard, Express }
-    public enum OrderState { Formation, Processing, Delivery, Done }
+    public enum OrderState { Formation, Processing, Delivery, Completed, Canceled }
 
     public class Order : ICloneable
     {
@@ -34,10 +34,11 @@ namespace Program
         public DateTimeOffset FormationDate { get; private set; }
         public DateTimeOffset TransferredToDeliveryDate { get; private set; }
         public DateTimeOffset DeliveredDate { get; private set; }
+        public DateTimeOffset CanceledDate { get; private set; }
 
-        public void NextState()
+        public void NextOrderState()
         {
-            if (state == OrderState.Done) throw new Exception("Достигнуто конечное состояние");
+            if (state >= OrderState.Completed) throw new Exception("Достигнуто конечное состояние");
             if (orderLines.Count == 0) throw new Exception("Заказ не может быть пустым");
             state++;
             if (state == OrderState.Processing)
@@ -50,8 +51,18 @@ namespace Program
             }
             else
             {
-                DeliveredDate = DateTimeOffset.Now; 
+                DeliveredDate = DateTimeOffset.Now;
             }
+        }
+
+        public void CancelOrder()
+        {
+            if (state > OrderState.Processing)
+            {
+                CanceledDate = DateTimeOffset.Now;
+                state = OrderState.Canceled;
+            }
+            else state = OrderState.Formation;
         }
 
         public double TotalCost
@@ -159,6 +170,7 @@ namespace Program
                 CreationDate = CreationDate,
                 FormationDate = FormationDate,
                 TransferredToDeliveryDate = TransferredToDeliveryDate,
+                CanceledDate = CanceledDate,
                 DeliveredDate = DeliveredDate,
                 orderLines = orderLines.Clone() as HashSet<OrderLine>,
                 discounts = discounts.Clone() as Dictionary<string, Discount>,

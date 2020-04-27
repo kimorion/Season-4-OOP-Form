@@ -164,7 +164,7 @@ namespace Program
             orderRoot.Nodes.Add(new TreeNode()
             {
                 Name = "state",
-                Text = "Текущее состояние: "+order.state.ToString(),
+                Text = "Текущее состояние: " + order.state.ToString(),
                 ToolTipText = "Состояние заказа"
             });
             orderRoot.Nodes.Add(new TreeNode()
@@ -177,38 +177,52 @@ namespace Program
             orderRoot.Nodes.Add(new TreeNode()
             {
                 Name = "creationDate",
-                Text = "Создан: "+order.CreationDate.ToString("dd.MM.yyyy"),
+                Text = "Создан: " + order.CreationDate.ToString("dd.MM.yyyy"),
                 ToolTipText = "Дата создания заказа",
                 Tag = new OrderArgs(customer, order)
             });
 
-            if(order.state >= OrderState.Processing)
+            if (order.state != OrderState.Canceled)
             {
-                orderRoot.Nodes.Add(new TreeNode()
+                if (order.state >= OrderState.Processing)
                 {
-                    Name = "formationDate",
-                    Text = "Подтвержден: " + order.FormationDate.ToString("dd.MM.yyyy"),
-                    ToolTipText = "Дата подтверждения заказа",
-                    Tag = new OrderArgs(customer, order)
-                });
+                    orderRoot.Nodes.Add(new TreeNode()
+                    {
+                        Name = "formationDate",
+                        Text = "Подтвержден: " + order.FormationDate.ToString("dd.MM.yyyy"),
+                        ToolTipText = "Дата подтверждения заказа",
+                        Tag = new OrderArgs(customer, order)
+                    });
+                }
+                if (order.state >= OrderState.Delivery)
+                {
+                    orderRoot.Nodes.Add(new TreeNode()
+                    {
+                        Name = "transferToDeliveryDate",
+                        Text = "Передан в службу доставки: " + order.TransferredToDeliveryDate.ToString("dd.MM.yyyy"),
+                        ToolTipText = "Дата передачи товара службе доставки",
+                        Tag = new OrderArgs(customer, order)
+                    });
+                }
+                if (order.state >= OrderState.Completed)
+                {
+                    orderRoot.Nodes.Add(new TreeNode()
+                    {
+                        Name = "deliveredDate",
+                        Text = "Доставлен: " + order.DeliveredDate.ToString("dd.MM.yyyy"),
+                        ToolTipText = "Дата передачи товара клиенту",
+                        Tag = new OrderArgs(customer, order),
+                        NodeFont = new System.Drawing.Font("Arial", 10, System.Drawing.FontStyle.Bold)
+                    });
+                }
             }
-            if (order.state >= OrderState.Delivery)
+            else
             {
                 orderRoot.Nodes.Add(new TreeNode()
                 {
-                    Name = "transferToDeliveryDate",
-                    Text = "Передан в службу доставки: " + order.TransferredToDeliveryDate.ToString("dd.MM.yyyy"),
-                    ToolTipText = "Дата передачи товара службе доставки",
-                    Tag = new OrderArgs(customer, order)
-                });
-            }
-            if (order.state >= OrderState.Done)
-            {
-                orderRoot.Nodes.Add(new TreeNode()
-                {
-                    Name = "deliveredDate",
-                    Text = "Доставлен: " + order.DeliveredDate.ToString("dd.MM.yyyy"),
-                    ToolTipText = "Дата передачи товара клиенту",
+                    Name = "canceledDate",
+                    Text = "Отменен: " + order.CanceledDate.ToString("dd.MM.yyyy"),
+                    ToolTipText = "Дата отмены заказа",
                     Tag = new OrderArgs(customer, order),
                     NodeFont = new System.Drawing.Font("Arial", 10, System.Drawing.FontStyle.Bold)
                 });

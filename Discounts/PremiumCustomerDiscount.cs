@@ -22,7 +22,7 @@ namespace Program.Promotion
                 return Refusal("Скидка только для клиентов со статусом Premium");
             var baseCheck = base.Check(customer, order);
             if (!baseCheck.Item1) return baseCheck;
-            return Permit();
+            return Permit(baseCheck.Item2);
         }
 
 

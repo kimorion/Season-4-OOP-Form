@@ -293,35 +293,32 @@ namespace Program
             {
                 case "address":
                     {
-                        if (parser.TryParseAddress(e.Label, out string result))
+                        if (parser.TryParseAddress(e.Label, out string result, ShowWarning))
                             if (db.TryEditAddress(args.id, args.orderNumber, result))
                             {
                                 node.EndEdit(false);
                                 return;
                             }
-                        ShowWarning("При вводе адреса разрешены только точка и запятая.");
                         break;
                     }
                 case "name":
                     {
-                        if (parser.TryParseName(e.Label, out FullName result))
+                        if (parser.TryParseName(e.Label, out FullName result, ShowWarning))
                             if (db.TryEditName(args.id, result))
                             {
                                 node.EndEdit(false);
                                 return;
                             }
-                        ShowWarning("ФИО должно быть написано через пробел и без лишних знаков");
                         break;
                     }
                 case "phone":
                     {
-                        if (parser.TryParsePhoneNumber(e.Label, out string result))
+                        if (parser.TryParsePhoneNumber(e.Label, out string result, ShowWarning))
                             if (db.TryEditPhoneNumber(args.id, result))
                             {
                                 node.EndEdit(false);
                                 return;
                             }
-                        ShowWarning("При вводе телефона используйте только цифры и знак '+'");
                         break;
                     }
                 case "privilege":
@@ -441,6 +438,7 @@ namespace Program
             orderContextMenu = new ContextMenu();
             var deleteOrderItem = new MenuItem("Удалить заказ");
             var nextStateItem = new MenuItem("Следующее состояние заказа");
+            var cancelOrderItem = new MenuItem("Отменить заказ");
             nextStateItem.Click += (sender, args) =>
             {
                 if (orderTree.SelectedNode != null)
@@ -459,8 +457,18 @@ namespace Program
                         db.TryDeleteOrder(orderArgs.id, orderArgs.orderNumber);
                     }
             };
+            cancelOrderItem.Click += (sender, args) =>
+            {
+                if (orderTree.SelectedNode != null)
+                    if (orderTree.SelectedNode.Name == "number")
+                    {
+                        var orderArgs = orderTree.SelectedNode.Tag as OrderArgs;
+                        db.TryCancelOrder(orderArgs.id, orderArgs.orderNumber);
+                    }
+            };
             orderContextMenu.MenuItems.Add(deleteOrderItem);
             orderContextMenu.MenuItems.Add(nextStateItem);
+            orderContextMenu.MenuItems.Add(cancelOrderItem);
 
             orderLineContextMenu = new ContextMenu();
             var deleteOrderLineItem = new MenuItem("Удалить товар из заказа");

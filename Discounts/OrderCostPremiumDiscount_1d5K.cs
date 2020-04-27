@@ -23,7 +23,7 @@ namespace Program.Promotion
                 return Refusal("Скидка для заказов стоимостью от 1500р.");
             var baseCheck = base.Check(customer, order);
             if (!baseCheck.Item1) return baseCheck;
-            return Permit();
+            return Permit(baseCheck.Item2);
         }
     }
 }

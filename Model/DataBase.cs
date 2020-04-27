@@ -137,7 +137,7 @@ namespace Program
                 UserWarning?.Invoke("У клиента нет заказа с указанным номером");
                 return false;
             }
-            customer.OrderManager.Remove(orderNumber);
+            customer.OrderManager.RemoveOrder(orderNumber);
             StateChanged?.Invoke();
             return true;
         }
@@ -443,7 +443,7 @@ namespace Program
                 return false;
             }
 
-            if (order.state == OrderState.Done)
+            if (order.state >= OrderState.Completed)
             {
                 UserWarning?.Invoke("Заказ уже находится в завершенном состоянии");
                 return false;
@@ -454,7 +454,36 @@ namespace Program
                 UserWarning?.Invoke("Заказ не должен быть пустым");
                 return false;
             }
-            order.NextState();
+            order.NextOrderState();
+            StateChanged?.Invoke();
+            return true;
+        }
+
+        public bool TryCancelOrder(string id, uint orderNumber)
+        {
+            if (!customers.TryGetValue(id, out Customer customer))
+            {
+                UserWarning?.Invoke("Клиент с указанным id не найден в базе");
+                return false;
+            }
+
+            if (!customer.OrderManager.TryGetOrder(orderNumber, out Order order))
+            {
+                UserWarning?.Invoke("Заказ с указанным номером не найден в базе");
+                return false;
+            }
+
+            if (order.state == OrderState.Formation)
+            {
+                UserWarning?.Invoke("Нельзя отменить неподтвержденный заказ");
+                return false;
+            }
+            if (order.state >= OrderState.Completed)
+            {
+                UserWarning?.Invoke("Заказ уже завершен");
+                return false;
+            }
+            order.CancelOrder();
             StateChanged?.Invoke();
             return true;
         }

@@ -24,7 +24,7 @@ namespace Program
             orders.Add(order.Number, order);
         }
 
-        public void Remove(uint number)
+        public void RemoveOrder(uint number)
         {
             if (!orders.Remove(number))
                 throw new Exception("There is no order with the given number");

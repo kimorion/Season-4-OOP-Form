@@ -22,7 +22,7 @@ namespace Program.Promotion
                 return Refusal("Заказ дешевле 1000 рублей");
             var baseCheck = base.Check(customer, order);
             if (!baseCheck.Item1) return baseCheck;
-            return Permit();
+            return Permit(baseCheck.Item2);
         }
 
 

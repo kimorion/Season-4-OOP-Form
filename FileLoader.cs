@@ -53,7 +53,7 @@ namespace Program
                 if (lineNumber == 0)
                     builder.AppendLine("Customers file was empty");
                 if (builder.Length != 0)
-                    informUser(builder.ToString());
+                    informUser?.Invoke(builder.ToString());
                 return result;
             }
         }
@@ -91,7 +91,7 @@ namespace Program
                 if (result.Count == 0)
                     builder.AppendLine("File was empty!");
                 if (builder.Length != 0)
-                    informUser(builder.ToString());
+                    informUser?.Invoke(builder.ToString());
                 return result;
             }
         }

@@ -23,7 +23,7 @@ namespace Program.Promotion
             if (!baseCheck.Item1) return baseCheck;
 
             if (result)
-                return Permit();
+                return Permit(baseCheck.Item2);
             else return Refusal("Дата формирования заказа не удовлетворяет сроку действия акции");
 
         }
