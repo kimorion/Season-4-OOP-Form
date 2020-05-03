@@ -694,8 +694,6 @@ namespace Program
             CreateLayout();
 
             InitializeDB(false);
-            LoadCustomersFromFile("CUSTOMERS.DAT");
-            LoadItemsFromFile("ITEMS.DAT");
             UpdateView();
 
             db.StateChanged += UpdateView;
